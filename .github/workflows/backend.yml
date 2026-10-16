@@ -42,6 +42,11 @@ jobs:
       - name: Dipendenze
         run: pip install -r requirements.txt -r requirements-dev.txt
 
+      - name: Vulnerabilità note nelle dipendenze
+        # 83 vulnerabilità erano rimaste nascoste per mesi (ottobre 2026): ora
+        # una nuova CVE in un pacchetto di requirements.txt fa fallire la CI.
+        run: pip-audit -r requirements.txt --progress-spinner off
+
       - name: Migration con una sola head
         # Due migration che rivedono la stessa revisione rompono `upgrade head`
         # in produzione: meglio scoprirlo qui.

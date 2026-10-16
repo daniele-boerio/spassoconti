@@ -1,0 +1,31 @@
+# Aggiornamenti automatici delle dipendenze: una PR a settimana per ecosistema,
+# con le versioni nuove (e subito quelle che chiudono una vulnerabilità nota).
+# Ogni PR passa dalla CI (test, E2E, pip-audit) prima di essere unita: niente
+# finisce in produzione senza che tu la approvi.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # Le patch e minor insieme, per non ricevere dieci PR da una riga
+      backend-minori:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      frontend-minori:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
