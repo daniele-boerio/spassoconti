@@ -1,6 +1,11 @@
 import { Action, createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { RootState } from "../../store/store";
 import {
+  isLatest,
+  LatestRequests,
+  rememberLatest,
+} from "../ui/latest_request";
+import {
   MonthlyDetailCategory,
   MonthlyDetailResponse,
   YearDetailsResponse,
@@ -33,6 +38,8 @@ interface StatisticsState {
   /** Rimborsi del mese, che i totali di `monthDetails` non contengono. */
   refunds: number;
   loading: boolean;
+  /** Ultima richiesta per tipo: mese e anno cambiano in fretta (vedi latest_request). */
+  latest: LatestRequests;
 }
 
 const initialState: StatisticsState = {
@@ -48,10 +55,15 @@ const initialState: StatisticsState = {
   previousTotal: null,
   refunds: 0,
   loading: false,
+  latest: {},
 };
 
-const handlePending = (state: StatisticsState) => {
+const handlePending = (
+  state: StatisticsState,
+  action: { type: string; meta: { requestId: string } },
+) => {
   state.loading = true;
+  rememberLatest(state.latest, action);
 };
 
 const handleRejected = (state: StatisticsState) => {
@@ -66,7 +78,9 @@ const statisticsSlice = createSlice({
     builder
       .addCase(
         getYearDetailsStatistics.fulfilled,
-        (state, action: PayloadAction<YearDetailsResponse>) => {
+        (state, action) => {
+          // Risposta di un anno già cambiato: si ignora.
+          if (!isLatest(state.latest, action)) return;
           state.loading = false;
           state.yearlyData = action.payload.data;
           state.yearlyTotals = {
@@ -79,7 +93,8 @@ const statisticsSlice = createSlice({
 
       .addCase(
         getMonthlyDetailsStatistics.fulfilled,
-        (state, action: PayloadAction<MonthlyDetailResponse>) => {
+        (state, action) => {
+          if (!isLatest(state.latest, action)) return;
           state.loading = false;
           state.monthlyData = action.payload.data;
           state.totals.incomes = action.payload.totale_entrata;

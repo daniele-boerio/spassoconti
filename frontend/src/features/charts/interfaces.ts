@@ -57,4 +57,6 @@ export interface ChartsState {
   categoryTrend: CategoryTrendOut[];
   loading: boolean;
   error: string | null;
+  /** Ultima richiesta per grafico: i filtri cambiano in fretta (vedi latest_request). */
+  latest: Record<string, string>;
 }

@@ -6,7 +6,9 @@ import reducer, {
 } from "./transaction_slice";
 import {
   createTransaction,
+  filtersKey,
   flushOfflineTransactions,
+  getTransactionsPaginated,
   updateTransaction,
 } from "./api_calls";
 import { QUEUED_OFFLINE } from "./offline_queue";
@@ -125,6 +127,8 @@ describe("scritture sulla lista dei movimenti", () => {
           total: 4,
           page: 2,
           size: 10,
+          // chiesta con i filtri di adesso: è una pagina valida da accodare
+          filtersKey: filtersKey(state.filters),
         },
         meta: { arg: { page: 2, size: 10, append: true } },
       },
@@ -233,5 +237,45 @@ describe("scritture sulla lista dei movimenti", () => {
       createTransaction.fulfilled(tx("1", "2026-10-04"), "req", params),
     );
     expect(next.revision).toBe(state.revision + 1);
+  });
+});
+
+describe("risposte fuori ordine della lista", () => {
+  const page = (id: string, key: string) => ({
+    data: [tx(id, "2026-10-04")],
+    total: 1,
+    page: 1,
+    size: 10,
+    total_entrata: 0,
+    total_uscita: 0,
+    total_rimborsi: 0,
+    filtersKey: key,
+  });
+
+  it("una lista superata non sostituisce quella nuova", () => {
+    const base = withList(0);
+    const args = { page: 1, size: 10 };
+    let state = reducer(base, getTransactionsPaginated.pending("vecchia", args));
+    state = reducer(state, getTransactionsPaginated.pending("nuova", args));
+    const key = filtersKey(state.filters);
+
+    // Arriva prima la nuova, poi quella vecchia (rete lenta): resta la nuova
+    state = reducer(state, getTransactionsPaginated.fulfilled(page("2", key), "nuova", args));
+    state = reducer(state, getTransactionsPaginated.fulfilled(page("1", key), "vecchia", args));
+
+    expect(state.transactions.map((t) => t.id)).toEqual(["2"]);
+  });
+
+  it("una pagina chiesta con i filtri di prima non si accoda", () => {
+    const state = withList(1);
+    const args = { page: 2, size: 10, append: true };
+    const vecchiFiltri = JSON.stringify({ ...state.filters, descrizione: "pizza" });
+
+    const next = reducer(
+      reducer(state, getTransactionsPaginated.pending("p2", args)),
+      getTransactionsPaginated.fulfilled(page("99", vecchiFiltri), "p2", args),
+    );
+
+    expect(next.transactions.map((t) => t.id)).toEqual(["1"]);
   });
 });

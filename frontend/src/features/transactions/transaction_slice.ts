@@ -10,6 +10,7 @@ import {
   flushOfflineTransactions,
   getLastTransactions,
   getTransactionsPaginated,
+  filtersKey,
   updateTransaction,
   splitTransaction,
 } from "./api_calls";
@@ -42,6 +43,7 @@ const initialState: TransactionsState = {
   pending: loadQueue(),
   pendingNotSaved: false,
   revision: 0,
+  listRequestId: null,
   period: DEFAULT_PERIOD,
   pagination: {
     total: null,
@@ -172,7 +174,20 @@ const transactionsSlice = createSlice({
       )
 
       // GET TransactionsPaginated
+      .addCase(getTransactionsPaginated.pending, (state, action) => {
+        if (!action.meta.arg.append) state.listRequestId = action.meta.requestId;
+      })
+
       .addCase(getTransactionsPaginated.fulfilled, (state, action) => {
+        // Risposte arrivate fuori ordine (filtro cambiato due volte in fretta,
+        // rete lenta): una lista superata non sostituisce quella nuova, e una
+        // pagina chiesta con i filtri di prima non si accoda alla lista nuova.
+        if (action.meta.arg.append) {
+          if (action.payload.filtersKey !== filtersKey(state.filters)) return;
+        } else if (action.meta.requestId !== state.listRequestId) {
+          return;
+        }
+
         // Le pagine oltre la prima si accodano: la lista dei Movimenti cresce
         // verso il basso invece di ripartire da capo.
         const loaded = action.payload.data.map(mapTransaction);

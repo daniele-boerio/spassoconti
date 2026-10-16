@@ -137,8 +137,15 @@ export const getTransaction = createAsyncThunk<Transaction, { id: string }>(
   },
 );
 
+/**
+ * I filtri con cui è partita una richiesta della lista, come stringa: lo slice
+ * accoda una pagina solo se i filtri sono ancora quelli (vedi fulfilled).
+ */
+export const filtersKey = (filters: RootState["transaction"]["filters"]) =>
+  JSON.stringify(filters);
+
 export const getTransactionsPaginated = createAsyncThunk<
-  PaginatedResponse,
+  PaginatedResponse & { filtersKey: string },
   PaginationParams
 >(
   "transazioni/getTransactionsPaginated",
@@ -156,7 +163,7 @@ export const getTransactionsPaginated = createAsyncThunk<
       const response = await api.get<PaginatedResponse>(
         `/transazioni/paginated?${params.toString()}`,
       );
-      return response.data;
+      return { ...response.data, filtersKey: filtersKey(state.transaction.filters) };
     } catch (error) {
       const err = error as AxiosError;
       return rejectWithValue(

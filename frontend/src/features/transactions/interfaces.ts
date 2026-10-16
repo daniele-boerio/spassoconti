@@ -71,6 +71,11 @@ export interface TransactionsState {
    * lo mettono fra le dipendenze del caricamento per non restare indietro.
    */
   revision: number;
+  /**
+   * L'ultima richiesta della lista "da capo" (non le pagine accodate): una
+   * risposta più vecchia che arriva dopo non deve sostituirla.
+   */
+  listRequestId: string | null;
   pagination: {
     total: number | null;
     page: number | null;

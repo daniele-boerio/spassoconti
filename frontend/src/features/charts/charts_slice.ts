@@ -7,6 +7,7 @@ import {
 } from "./api_calls";
 import { ChartsState } from "./interfaces";
 import { RootState } from "../../store/store";
+import { isLatest, rememberLatest } from "../ui/latest_request";
 
 const initialState: ChartsState = {
   incomeExpense: [],
@@ -15,10 +16,15 @@ const initialState: ChartsState = {
   categoryTrend: [],
   loading: false,
   error: null,
+  latest: {},
 };
 
-const handlePending = (state: ChartsState) => {
+const handlePending = (
+  state: ChartsState,
+  action: { type: string; meta: { requestId: string } },
+) => {
   state.loading = true;
+  rememberLatest(state.latest, action);
 };
 
 const handleRejected = (state: ChartsState, action: any) => {
@@ -33,18 +39,26 @@ const chartsSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(getIncomeExpenseChart.fulfilled, (state, action) => {
+        // Risposta di filtri già cambiati: si ignora.
+        if (!isLatest(state.latest, action)) return;
         state.loading = false;
         state.incomeExpense = action.payload;
       })
       .addCase(getSavingsChart.fulfilled, (state, action) => {
+        // Risposta di filtri già cambiati: si ignora.
+        if (!isLatest(state.latest, action)) return;
         state.loading = false;
         state.savings = action.payload;
       })
       .addCase(getExpenseCompositionChart.fulfilled, (state, action) => {
+        // Risposta di filtri già cambiati: si ignora.
+        if (!isLatest(state.latest, action)) return;
         state.loading = false;
         state.expenseComposition = action.payload;
       })
       .addCase(getCategoryTrendChart.fulfilled, (state, action) => {
+        // Risposta di filtri già cambiati: si ignora.
+        if (!isLatest(state.latest, action)) return;
         state.loading = false;
         state.categoryTrend = action.payload;
       })
