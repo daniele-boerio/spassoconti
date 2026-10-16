@@ -1,0 +1,5 @@
+# App di finanze personali, dietro login: niente da indicizzare.
+# Senza questo file nginx rispondeva con l'index.html della SPA, che i motori
+# di ricerca (e Lighthouse) leggevano come un robots.txt malformato.
+User-agent: *
+Disallow: /

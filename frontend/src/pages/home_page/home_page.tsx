@@ -94,6 +94,10 @@ export default function HomePage() {
   const navigate = useNavigate();
 
   const [profileOpen, setProfileOpen] = useState(false);
+  // Al primo render la richiesta degli ultimi movimenti non è ancora partita
+  // (loading è false e la lista vuota): senza questo si vedeva per un attimo lo
+  // stato "nessun movimento", poi lo skeleton, poi la lista — tre altezze.
+  const [latestReady, setLatestReady] = useState(false);
 
   const spending = useAppSelector(selectContiMonthlySpending);
   const budget = useAppSelector(selectContiMonthlyBudget);
@@ -116,7 +120,9 @@ export default function HomePage() {
     dispatch(getConti());
     dispatch(getCategorie());
     dispatch(getTags());
-    dispatch(getLastTransactions({ n: LATEST_TRANSACTIONS }));
+    dispatch(getLastTransactions({ n: LATEST_TRANSACTIONS })).finally(() =>
+      setLatestReady(true),
+    );
 
     // Dati che il BE non espone come tali: li ricompone lo slice `home`.
     dispatch(getUpcomingRecurrences({ days: UPCOMING_DAYS }));
@@ -345,7 +351,7 @@ export default function HomePage() {
                 {t("home_latest")}
               </CardTitle>
 
-              {transactionsLoading && transactions.length === 0 ? (
+              {(transactionsLoading || !latestReady) && transactions.length === 0 ? (
                 <SkeletonList />
               ) : transactions.length === 0 ? (
                 <EmptyState

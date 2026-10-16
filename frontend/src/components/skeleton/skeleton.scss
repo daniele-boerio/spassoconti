@@ -3,13 +3,17 @@
 .skeleton {
   display: flex;
   flex-direction: column;
-  gap: 13px;
   animation: skeleton-pulse 1.4s ease-in-out infinite;
 
+  // Alta quanto una ListRow vera (stesso min-height e padding): con righe più
+  // basse, all'arrivo dei dati la card cresceva e spostava tutto quello che
+  // c'era sotto (CLS 0,16 sulla Home secondo Lighthouse).
   &__row {
     display: flex;
     align-items: center;
     gap: 12px;
+    min-height: v.$tap-target;
+    padding: 13px 0;
   }
 
   &__avatar {
