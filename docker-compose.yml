@@ -7,7 +7,7 @@ services:
     environment:
       - SERVICE_FQDN_FRONTEND
     depends_on:
-      - backend
+      - spassoconti-backend
     healthcheck:
       # 127.0.0.1 e non localhost: nginx.conf fa solo `listen 80` (IPv4), mentre dentro
       # il container localhost risolve prima su ::1 e busybox wget non ripiega su IPv4.
@@ -18,11 +18,14 @@ services:
 
   # ── Backend (FastAPI) ──
   # Nessun dominio pubblico: ci parla solo nginx, via rete Docker interna.
+  # Il nome del servizio è anche il suo hostname, e deve essere UNIVOCO: per
+  # raggiungere il DB lo stack sta anche sulla rete condivisa `coolify`, dove
+  # altri progetti hanno già un servizio `backend` — con un nome generico nginx
+  # girava le richieste a rotazione al nostro BE e a quello di un altro progetto.
   # Il Postgres NON è qui: è una risorsa separata (Coolify, SpassoConto-DB), e le
   # DB_* vanno impostate nelle Environment Variables. DB_HOST è il nome INTERNO del
   # container del DB, non l'IP dell'host: la porta pubblica del DB è chiusa.
-  # In locale c'è docker-compose.dev.yml.
-  backend:
+  spassoconti-backend:
     build: ./backend
     environment:
       # I default (${VAR:-valore}) non sono decorativi: senza, una variabile non
