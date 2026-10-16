@@ -74,6 +74,14 @@ npm run test       # vitest
   touches that side (`frontend.yml` also builds; `backend.yml` also checks there is a
   single Alembic head). Still **not** configured: a formatter
   (`prettier`/`black`/`ruff`) and pre-commit — don't claim those exist.
+- **E2E:** `npm run test:e2e` (from `frontend/`) runs Playwright on the critical path
+  login → new transaction → balance updated (`frontend/e2e/*.e2e.ts`). Playwright
+  starts its own backend on a throwaway SQLite (`backend/scripts/e2e_server.py`,
+  port 8001, via `DATABASE_URL`) and Vite on 5174 — it never touches production.
+  Locally it uses Edge (no Chrome on this PC), in CI Chromium (`.github/workflows/e2e.yml`).
+  Selectors are accessible roles/names: renaming a visible label breaks the E2E.
+- **Coverage:** `venv/Scripts/python.exe -m pytest -q --cov=. --cov-report=term-missing`
+  (backend), `npx vitest run --coverage` (frontend).
 - **Balances are verified.** Every account keeps a `saldo_base` (balance minus the
   effect of its active transactions); a nightly job and `GET /api/conti/verifica-saldi`
   flag accounts where it moved. Any code that moves a balance goes through
