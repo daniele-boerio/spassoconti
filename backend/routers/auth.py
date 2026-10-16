@@ -1,3 +1,4 @@
+import hashlib
 import secrets
 import os
 import logging
@@ -36,14 +37,21 @@ def send_reset_email(email_to: str, reset_link: str):
     smtp_password = os.getenv("SMTP_PASSWORD")
     email_from = os.getenv("EMAIL_FROM", "noreply@example.com")
 
-    # Se le configurazioni SMTP non sono presenti, fai il mock (utile in sviluppo)
+    # Se le configurazioni SMTP non sono presenti, fai il mock (utile in sviluppo).
+    # In produzione il link NON va nei log: contiene il token, e chi legge i log
+    # potrebbe resettare la password di chiunque. Lì è un errore di configurazione.
     if not smtp_server or not smtp_username or not smtp_password:
-        logger.warning(
-            "SMTP non configurato: email di reset SIMULATA (MOCK) per %s. "
-            "Link di reset: %s",
-            email_to,
-            reset_link,
-        )
+        if os.getenv("ENVIRONMENT", "development").lower() == "production":
+            logger.error(
+                "SMTP non configurato: email di reset per %s NON inviata", email_to
+            )
+        else:
+            logger.warning(
+                "SMTP non configurato: email di reset SIMULATA (MOCK) per %s. "
+                "Link di reset: %s",
+                email_to,
+                reset_link,
+            )
         return
 
     try:
@@ -55,13 +63,21 @@ def send_reset_email(email_to: str, reset_link: str):
         msg["From"] = email_from
         msg["To"] = email_to
 
-        with smtplib.SMTP(smtp_server, int(smtp_port)) as server:
+        # timeout: senza, un server SMTP che non risponde tiene occupato per
+        # sempre un thread del pool (il task gira in BackgroundTasks).
+        with smtplib.SMTP(smtp_server, int(smtp_port), timeout=10) as server:
             server.starttls()
             server.login(smtp_username, smtp_password)
             server.send_message(msg)
             logger.info("Email di reset inviata con successo a %s", email_to)
-    except Exception as e:
-        logger.error("Errore durante l'invio dell'email a %s: %s", email_to, e)
+    except Exception:
+        logger.exception("Errore durante l'invio dell'email di reset a %s", email_to)
+
+
+def _hash_reset_token(token: str) -> str:
+    # Come per i refresh token: in DB solo l'impronta, così un dump del database
+    # non regala link di reset validi per i 30 minuti successivi.
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 @router.post("/forgot-password")
@@ -72,7 +88,9 @@ def forgot_password(
     background_tasks: BackgroundTasks,  # Usiamo BackgroundTasks per non bloccare la risposta
     db: Session = Depends(get_db),
 ):
-    user = db.query(User).filter(User.email == payload.email).first()
+    # Le email si salvano in minuscolo (/register): senza lower() chi scrive una
+    # maiuscola non riceverebbe mai il link.
+    user = db.query(User).filter(User.email == payload.email.lower()).first()
 
     # BEST PRACTICE DI SICUREZZA:
     # Anche se l'utente non esiste, restituiamo sempre "OK".
@@ -80,7 +98,7 @@ def forgot_password(
     if user:
         # 1. Genera un token sicuro e imposta la scadenza (es. 30 minuti)
         token = secrets.token_urlsafe(32)
-        user.reset_token = token
+        user.reset_token = _hash_reset_token(token)
         user.reset_token_expiration = datetime.utcnow() + timedelta(minutes=30)
 
         db.commit()
@@ -107,7 +125,11 @@ def reset_password(
     db: Session = Depends(get_db),
 ):
     # 1. Cerca l'utente tramite il token
-    user = db.query(User).filter(User.reset_token == payload.token).first()
+    user = (
+        db.query(User)
+        .filter(User.reset_token == _hash_reset_token(payload.token))
+        .first()
+    )
 
     # 2. Verifica se il token esiste ed è ancora valido
     if not user:

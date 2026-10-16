@@ -69,6 +69,8 @@ def test_riuso_di_un_token_gia_ruotato_revoca_tutta_la_famiglia(db_session):
 
     first = auth.consume_refresh_token(db_session, raw1)
     raw2 = auth.issue_refresh_token(db_session, user.id, family_id=first.family_id)
+    # Il replay arriva dopo la finestra dei rinnovi concorrenti (10 s)
+    first.used_at = datetime.now(timezone.utc) - timedelta(minutes=1)
     db_session.commit()
 
     # Replay del token già ruotato
@@ -89,6 +91,26 @@ def test_riuso_di_un_token_gia_ruotato_revoca_tutta_la_famiglia(db_session):
         .count()
     )
     assert attivi == 0
+
+
+def test_rinnovo_concorrente_non_revoca_la_sessione(db_session):
+    """Due schede che rinnovano nello stesso istante: la seconda trova il token
+    appena usato. È la stessa sessione, non un furto: 409 e nessuna revoca, così
+    l'utente non viene buttato fuori e il token nuovo resta valido."""
+    user = _make_user(db_session)
+    raw1 = auth.issue_refresh_token(db_session, user.id)
+    db_session.commit()
+
+    first = auth.consume_refresh_token(db_session, raw1)
+    raw2 = auth.issue_refresh_token(db_session, user.id, family_id=first.family_id)
+    db_session.commit()
+
+    with pytest.raises(HTTPException) as exc:
+        auth.consume_refresh_token(db_session, raw1)
+    assert exc.value.status_code == 409
+
+    # Il token nuovo della stessa famiglia funziona ancora
+    assert auth.consume_refresh_token(db_session, raw2).revoked_at is None
 
 
 def test_token_scaduto_rifiutato(db_session):

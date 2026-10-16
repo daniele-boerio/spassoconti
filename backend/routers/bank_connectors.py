@@ -1,3 +1,4 @@
+import logging
 from fastapi import (
     APIRouter,
     Depends,
@@ -10,6 +11,8 @@ from fastapi import (
 from sqlalchemy.orm import Session
 from database import get_db
 import auth
+
+logger = logging.getLogger(__name__)
 from schemas.bank_transaction import (
     BankConnectorConfigCreate,
     BankConnectorConfigOut,
@@ -130,12 +133,13 @@ def sync_bank_connector(
     try:
         candidates = fetch_bank_transactions_for_conto(db, conto)
     except Exception as e:
+        logger.exception("Sync del connettore bancario fallita (conto %s)", conto.id)
         conto.bank_connector_last_error = str(e)
         db.add(conto)
         db.commit()
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to fetch bank transactions: {str(e)}",
+            detail="Failed to fetch bank transactions",
         )
 
     new_proposals = 0
@@ -209,10 +213,17 @@ def import_bank_statement(
                 data_da=data_da,
                 data_a=data_a,
             )
-    except Exception as e:
+    except ValueError as e:
+        # I ValueError del parser sono messaggi per l'utente ("colonna mancante"…)
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Could not read the statement file: {str(e)}",
+            detail=f"Could not read the statement file: {e}",
+        )
+    except Exception:
+        logger.exception("Lettura dell'estratto conto fallita")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Could not read the statement file",
         )
 
     parsed = len(movimenti)
@@ -226,11 +237,12 @@ def import_bank_statement(
             ):
                 new_proposals += 1
         db.commit()
-    except Exception as e:
+    except Exception:
         db.rollback()
+        logger.exception("Salvataggio delle proposte dall'estratto conto fallito")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to save statement proposals: {str(e)}",
+            detail="Failed to save statement proposals",
         )
 
     return BankStatementImportResponse(
@@ -311,18 +323,19 @@ def import_bank_transaction_proposal_endpoint(
             db, proposal, import_data, current_user_id
         )
         update_category_usage(
-            db, import_data.categoria_id, import_data.sottocategoria_id
+            db, current_user_id, import_data.categoria_id, import_data.sottocategoria_id
         )
         conto.lastImport = datetime.now(timezone.utc)
         db.add(conto)
         db.commit()
         db.refresh(new_trans)
         return new_trans
-    except Exception as e:
+    except Exception:
         db.rollback()
+        logger.exception("Import della proposta bancaria fallito")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to import proposal: {str(e)}",
+            detail="Failed to import proposal",
         )
 
 

@@ -1,3 +1,4 @@
+import logging
 import os
 import secrets
 
@@ -6,6 +7,8 @@ from sqlalchemy.orm import Session
 
 import auth
 from database import get_db
+
+logger = logging.getLogger(__name__)
 from models import Conto, User
 from schemas import ContoOut
 from schemas.open_banking import (
@@ -49,10 +52,11 @@ def get_institutions(
     """Step 1 support: list the banks (ASPSPs) the user can pick from."""
     try:
         return list_enable_banking_aspsps(country)
-    except Exception as e:
+    except Exception:
+        logger.exception("Open Banking: Failed to fetch institutions")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to fetch institutions: {str(e)}",
+            detail="Failed to fetch institutions",
         )
 
 
@@ -77,10 +81,11 @@ def start_bank_auth(
         result = start_enable_banking_auth(
             payload.aspsp_name, payload.aspsp_country, redirect_url, state
         )
-    except Exception as e:
+    except Exception:
+        logger.exception("Open Banking: Failed to start bank authorization")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to start bank authorization: {str(e)}",
+            detail="Failed to start bank authorization",
         )
 
     url = result.get("url")
@@ -127,12 +132,13 @@ def confirm_bank_session(
     try:
         session = create_enable_banking_session(payload.code)
     except Exception as e:
+        logger.exception("Open Banking: creazione della sessione fallita (conto %s)", conto.id)
         conto.bank_connector_last_error = str(e)
         db.add(conto)
         db.commit()
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to create bank session: {str(e)}",
+            detail="Failed to create bank session",
         )
 
     accounts = session.get("accounts") or []

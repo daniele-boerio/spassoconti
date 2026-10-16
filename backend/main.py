@@ -85,9 +85,48 @@ scheduler.add_job(task_verifica_saldi, "cron", hour=4, minute=30)
 scheduler.add_job(task_sync_bank_connectors, "cron", hour="*/6")
 
 
+VARIABILI_OBBLIGATORIE = (
+    "DB_USER",
+    "DB_PASSWORD",
+    "DB_HOST",
+    "DB_PORT",
+    "DB_NAME",
+    "SECRET_KEY",
+    "ALGORITHM",
+    "FRONTEND_URL",
+)
+ALGORITMI_JWT = {"HS256", "HS384", "HS512"}
+
+
+def verifica_configurazione() -> None:
+    """In produzione l'app non parte con la configurazione incompleta.
+
+    Senza questo controllo una variabile mancante non si vedeva all'avvio: il
+    processo partiva, /api/health era verde, e il primo login (SECRET_KEY) o la
+    prima query (DB_*) andavano in 500. Fermarsi qui fa fallire il deploy, che
+    è il posto giusto per accorgersene. L'SMTP è facoltativo: senza, il reset
+    password non manda mail, e lo si dice forte nei log.
+    """
+    mancanti = [nome for nome in VARIABILI_OBBLIGATORIE if not os.getenv(nome)]
+    if mancanti:
+        raise RuntimeError(
+            "Configurazione incompleta, mancano: " + ", ".join(mancanti)
+        )
+    if os.getenv("ALGORITHM") not in ALGORITMI_JWT:
+        raise RuntimeError(
+            f"ALGORITHM deve essere uno di {sorted(ALGORITMI_JWT)}"
+        )
+    if len(os.getenv("SECRET_KEY", "")) < 32:
+        logger.warning("SECRET_KEY corta (< 32 caratteri): meglio rigenerarla")
+    if not all(os.getenv(n) for n in ("SMTP_SERVER", "SMTP_USERNAME", "SMTP_PASSWORD")):
+        logger.error("SMTP non configurato: il reset password non invierà email")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    if IS_PRODUCTION:
+        verifica_configurazione()
     if RUN_SCHEDULER:
         scheduler.start()
         logger.info("Scheduler avviato su questo processo")

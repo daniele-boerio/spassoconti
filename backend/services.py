@@ -16,6 +16,7 @@ import models
 from dateutil.relativedelta import relativedelta
 from sqlalchemy.orm import Query, Session
 from sqlalchemy import and_, asc, case, desc, func, or_
+from sqlalchemy import inspect as sa_inspect
 from pydantic import BaseModel
 from decimal import Decimal, InvalidOperation, ROUND_CEILING
 from typing import Optional
@@ -1890,7 +1891,11 @@ def apply_filters_and_sort(query: Query, model, filters):
             "nome_titolo",
         ] and hasattr(model, field):
             column = getattr(model, field)
-            query = query.filter(column.ilike(f"%{value}%"))
+            # % e _ sono jolly di LIKE: cercati alla lettera, non come pattern.
+            testo = (
+                str(value).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            )
+            query = query.filter(column.ilike(f"%{testo}%", escape="\\"))
 
         # 5. Uguaglianza standard per gli altri campi singoli
         elif hasattr(model, field):
@@ -1908,7 +1913,10 @@ def apply_filters_and_sort(query: Query, model, filters):
             else:
                 field, order = item, "asc"  # Default se non specificato
 
-            if hasattr(model, field):
+            # Solo colonne vere: `hasattr` lasciava passare relazioni, property e
+            # metadati (sort_by=user, sort_by=metadata) che finivano in un 500.
+            # Un campo sconosciuto si ignora, come prima.
+            if field in sa_inspect(model).columns.keys():
                 column = getattr(model, field)
                 clause = desc(column) if order.lower() == "desc" else asc(column)
                 order_clauses.append(clause)

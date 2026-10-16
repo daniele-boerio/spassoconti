@@ -27,6 +27,9 @@ REFRESH_COOKIE_NAME = "refresh_token"
 # cookie non viene nemmeno allegato alle altre chiamate API.
 # Il path è quello visto dal browser, quindi con il prefisso /api (main.API_PREFIX).
 REFRESH_COOKIE_PATH = "/api/auth"
+# Un refresh token riusato entro questa finestra è un rinnovo concorrente della
+# stessa sessione (due schede), non un replay: vedi consume_refresh_token.
+REFRESH_CONCORRENTE = timedelta(seconds=10)
 
 
 def get_password_hash(password: str):
@@ -155,9 +158,14 @@ def consume_refresh_token(db: Session, raw_token: str) -> RefreshToken:
         detail="Invalid or expired session",
     )
 
+    # FOR UPDATE: due refresh simultanei con lo stesso cookie (due schede)
+    # passerebbero entrambi il controllo su used_at e aprirebbero due rami della
+    # stessa famiglia, aggirando la reuse detection. Col lock il secondo aspetta
+    # e trova il token già usato.
     db_token = (
         db.query(RefreshToken)
         .filter(RefreshToken.token_hash == _hash_refresh_token(raw_token))
+        .with_for_update()
         .first()
     )
 
@@ -166,6 +174,17 @@ def consume_refresh_token(db: Session, raw_token: str) -> RefreshToken:
 
     if db_token.revoked_at is not None:
         raise invalid
+
+    if db_token.used_at is not None and datetime.now(timezone.utc) - _as_utc(
+        db_token.used_at
+    ) < REFRESH_CONCORRENTE:
+        # Usato da pochi secondi: è l'altra scheda che ha rinnovato nello stesso
+        # istante, non un furto. Niente revoca (butterebbe fuori l'utente): un
+        # 409, e il browser ha già il cookie nuovo per il tentativo successivo.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Session refresh already in progress",
+        )
 
     if db_token.used_at is not None:
         # Reuse detection: token già ruotato → sessione compromessa.

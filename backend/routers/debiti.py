@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import get_db
@@ -8,6 +9,8 @@ from models import Debito, Conto, Transazione
 from services import ricorrenza_del_debito, stima_fine_debito
 from decimal import Decimal
 from datetime import date, datetime, timezone
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/debiti", tags=["Debiti"])
 
@@ -66,9 +69,10 @@ def create_debito(
         db.commit()
         db.refresh(new)
         return new
-    except Exception as e:
+    except Exception:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Operazione sui debiti fallita")
+        raise HTTPException(status_code=500, detail="Debt operation failed")
 
 
 @router.put("/{debito_id}", response_model=DebitoOut)
@@ -113,9 +117,10 @@ def update_debito(
         db.commit()
         db.refresh(db_debito)
         return db_debito
-    except Exception as e:
+    except Exception:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Operazione sui debiti fallita")
+        raise HTTPException(status_code=500, detail="Debt operation failed")
 
 
 @router.delete("/{debito_id}")
@@ -143,9 +148,10 @@ def delete_debito(
         db.delete(db_debito)
         db.commit()
         return {"message": "Debito deleted"}
-    except Exception as e:
+    except Exception:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Operazione sui debiti fallita")
+        raise HTTPException(status_code=500, detail="Debt operation failed")
 
 
 from pydantic import BaseModel
@@ -225,6 +231,7 @@ def pay_debito(
         db.commit()
         db.refresh(trans)
         return trans
-    except Exception as e:
+    except Exception:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Operazione sui debiti fallita")
+        raise HTTPException(status_code=500, detail="Debt operation failed")

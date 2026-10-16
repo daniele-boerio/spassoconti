@@ -2,7 +2,7 @@ import csv
 import io
 import logging
 from typing import Annotated, Optional
-from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from database import get_db
@@ -38,25 +38,32 @@ logger = logging.getLogger(__name__)
 
 
 # Funzione di utilità per aggiornare le date delle categorie
+# Scoped per utente come ogni altra query: un id altrui (arrivato da un body non
+# validato) non deve poter toccare righe di un altro utente, nemmeno un timestamp.
 def update_category_usage(
-    db: Session, categoria_id: int = None, sottocategoria_id: int = None
+    db: Session,
+    user_id: int,
+    categoria_id: int = None,
+    sottocategoria_id: int = None,
 ):
     now = datetime.now(timezone.utc)
     if categoria_id:
-        db.query(Categoria).filter(Categoria.id == categoria_id).update(
-            {"lastImport": now}
-        )
+        db.query(Categoria).filter(
+            Categoria.id == categoria_id, Categoria.user_id == user_id
+        ).update({"lastImport": now})
     if sottocategoria_id:
-        db.query(Sottocategoria).filter(Sottocategoria.id == sottocategoria_id).update(
-            {"lastImport": now}
-        )
+        db.query(Sottocategoria).filter(
+            Sottocategoria.id == sottocategoria_id, Sottocategoria.user_id == user_id
+        ).update({"lastImport": now})
 
 
 # Funzione di utilità per aggiornare le date dei conti
-def update_conto_usage(db: Session, conto_id: int):
+def update_conto_usage(db: Session, user_id: int, conto_id: int):
     now = datetime.now(timezone.utc)
     if conto_id:
-        db.query(Conto).filter(Conto.id == conto_id).update({"lastImport": now})
+        db.query(Conto).filter(Conto.id == conto_id, Conto.user_id == user_id).update(
+            {"lastImport": now}
+        )
 
 
 def adjust_parent_netto(
@@ -376,8 +383,10 @@ def create_transazione(
         # --------------------------------------
 
         # AGGIORNAMENTO lastImport / Usage
-        update_category_usage(db, new_trans.categoria_id, new_trans.sottocategoria_id)
-        update_conto_usage(db, transazione.conto_id)
+        update_category_usage(
+            db, current_user_id, new_trans.categoria_id, new_trans.sottocategoria_id
+        )
+        update_conto_usage(db, current_user_id, transazione.conto_id)
 
         # Il tag appena scelto diventa il default del prossimo inserimento.
         # Solo quando l'ha scelto davvero l'utente: il giroconto il campo tag non
@@ -530,8 +539,10 @@ def split_transazione(
 
 @router.get("/paginated", response_model=TransazionePagination)
 def get_transazioni(
-    page: int = 1,
-    size: int = 10,
+    # Limiti espliciti: page=0 dava un OFFSET negativo (500 da Postgres) e un
+    # size enorme caricava tutto in memoria. Il FE chiede al massimo 25.
+    page: int = Query(1, ge=1),
+    size: int = Query(10, ge=1, le=200),
     filters: TransazioneFilters = Depends(),
     db: Session = Depends(get_db),
     current_user_id: int = Depends(auth.get_current_user_id),
@@ -980,8 +991,10 @@ def update_transazione(
         _adjust_debito_residuo(db_trans.debito_id, -db_trans.importo)
 
         # E. AGGIORNAMENTO lastImport (usiamo i nuovi ID se sono cambiati)
-        update_category_usage(db, db_trans.categoria_id, db_trans.sottocategoria_id)
-        update_conto_usage(db, db_trans.conto_id)
+        update_category_usage(
+            db, current_user_id, db_trans.categoria_id, db_trans.sottocategoria_id
+        )
+        update_conto_usage(db, current_user_id, db_trans.conto_id)
 
         db.commit()
         db.refresh(db_trans)
@@ -990,12 +1003,11 @@ def update_transazione(
     except HTTPException:
         db.rollback()
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to update transaction: {str(e)}",
-        )
+        # Il testo dell'eccezione (tabelle, colonne, valori) resta nei log.
+        logger.exception("Aggiornamento della transazione %s fallito", transazione_id)
+        raise HTTPException(status_code=500, detail="Failed to update transaction")
 
 
 @router.delete("/{transazione_id}")
