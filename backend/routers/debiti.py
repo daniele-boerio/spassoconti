@@ -182,6 +182,7 @@ def pay_debito(
     conto = (
         db.query(Conto)
         .filter(Conto.id == conto_id, Conto.user_id == current_user_id)
+        .with_for_update()
         .first()
     )
     if not conto:

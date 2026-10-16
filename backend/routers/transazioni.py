@@ -196,6 +196,7 @@ def create_transazione(
             Conto.user_id == current_user_id,
             Conto.deleted_at.is_(None),
         )
+        .with_for_update()
         .first()
     )
 
@@ -236,6 +237,7 @@ def create_transazione(
                 Conto.user_id == current_user_id,
                 Conto.deleted_at.is_(None),
             )
+            .with_for_update()
             .first()
         )
         if not conto_dest:
@@ -259,6 +261,7 @@ def create_transazione(
                 Conto.user_id == current_user_id,
                 Conto.deleted_at.is_(None),
             )
+            .with_for_update()
             .first()
         )
         if not conto_dest:
@@ -758,6 +761,7 @@ def update_transazione(
     conto_vecchio = (
         db.query(Conto)
         .filter(Conto.id == db_trans.conto_id, Conto.user_id == current_user_id)
+        .with_for_update()
         .first()
     )
 
@@ -797,6 +801,7 @@ def update_transazione(
                         Conto.id == old_conto_dest_id,
                         Conto.user_id == current_user_id,
                     )
+                    .with_for_update()
                     .first()
                 )
                 if old_dest:
@@ -894,6 +899,7 @@ def update_transazione(
                 Conto.user_id == current_user_id,
                 Conto.deleted_at.is_(None),
             )
+            .with_for_update()
             .first()
         )
 
@@ -921,6 +927,7 @@ def update_transazione(
                         Conto.user_id == current_user_id,
                         Conto.deleted_at.is_(None),
                     )
+                    .with_for_update()
                     .first()
                 )
                 if not conto_dest_nuovo:
@@ -1023,6 +1030,7 @@ def delete_transazione(
     conto = (
         db.query(Conto)
         .filter(Conto.id == db_trans.conto_id, Conto.user_id == current_user_id)
+        .with_for_update()
         .first()
     )
 
@@ -1047,6 +1055,7 @@ def delete_transazione(
                         Conto.id == db_trans.conto_destinazione_id,
                         Conto.user_id == current_user_id,
                     )
+                    .with_for_update()
                     .first()
                 )
                 if conto_dest:
@@ -1098,6 +1107,7 @@ def delete_transazione(
                     Conto.id == figlio.conto_id,
                     Conto.user_id == current_user_id,
                 )
+                .with_for_update()
                 .first()
             )
             if conto_figlio is not None:

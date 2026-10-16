@@ -326,6 +326,7 @@ def correggi_saldo(
             Conto.user_id == current_user_id,
             Conto.deleted_at.is_(None),
         )
+        .with_for_update()
         .first()
     )
 
@@ -402,6 +403,8 @@ def consolida_conti(
     Idempotente: con un conto solo non fa niente e ritorna quello.
     """
     target = ensure_default_conto(db, current_user_id)
+    # Il saldo del target cresce qui sotto: lock sulla riga (vedi applica_effetto_saldo).
+    db.refresh(target, with_for_update=True)
 
     altri = (
         db.query(Conto)
@@ -475,6 +478,8 @@ def rinuncia_ai_conti(
     Idempotente: chi ha già solo il conto invisibile se lo ritrova identico.
     """
     target = ensure_conto_virtuale(db, current_user_id)
+    # Il saldo del target cresce qui sotto: lock sulla riga (vedi applica_effetto_saldo).
+    db.refresh(target, with_for_update=True)
 
     reali = (
         db.query(Conto)
@@ -552,6 +557,7 @@ def assorbi_conto_virtuale(
             Conto.user_id == current_user_id,
             Conto.deleted_at.is_(None),
         )
+        .with_for_update()
         .first()
     )
 
@@ -574,6 +580,7 @@ def assorbi_conto_virtuale(
             Conto.deleted_at.is_(None),
             Conto.virtuale.is_(True),
         )
+        .with_for_update()
         .all()
     )
 

@@ -213,6 +213,7 @@ def esegui_ricorrenza(
     conto = (
         db.query(models.Conto)
         .filter(models.Conto.id == ric.conto_id, models.Conto.user_id == ric.user_id)
+        .with_for_update()
         .first()
     )
 
@@ -384,10 +385,15 @@ def applica_effetto_saldo(
     conti_toccati = {transazione.conto_id, transazione.conto_destinazione_id}
     conti_toccati.discard(None)
 
-    for conto_id in conti_toccati:
+    # FOR UPDATE: il saldo si rilegge e si riscrive, e senza lock due richieste
+    # sullo stesso conto (la coda offline che invia tre movimenti insieme, un job
+    # notturno) partirebbero dallo stesso valore e una somma andrebbe persa. In
+    # ordine di id, così due giroconti incrociati non si bloccano a vicenda.
+    for conto_id in sorted(conti_toccati):
         conto = (
             db.query(models.Conto)
             .filter(models.Conto.id == conto_id, models.Conto.user_id == user_id)
+            .with_for_update()
             .first()
         )
         if conto is not None:
@@ -837,6 +843,7 @@ def task_ricarica_automatica_conti():
                             models.Conto.id == conto.conto_sorgente_id,
                             models.Conto.user_id == conto.user_id,
                         )
+                        .with_for_update()
                         .first()
                     )
 
@@ -1244,6 +1251,7 @@ def import_bank_transaction_proposal(db, proposal, import_data, current_user_id)
             Conto.user_id == current_user_id,
             Conto.deleted_at.is_(None),
         )
+        .with_for_update()
         .first()
     )
     if not conto:

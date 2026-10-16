@@ -76,6 +76,13 @@ def create_xxx(
 - Code that sets a balance **by hand** (create/edit account, consolidate, absorb,
   delete/restore an account) must call `allinea_saldo_base` /
   `allinea_saldi_base_utente` before commit, or the check raises a false alarm.
+- **Lock before you touch a balance.** Every write path loads the conti it will
+  change with `.with_for_update()` (and `applica_effetto_saldo` locks them in id
+  order). The balance is read-modify-write in Python: without the row lock two
+  concurrent requests on one conto (offline queue flushing, a nightly job) lose an
+  update. A conto obtained otherwise (e.g. `ensure_default_conto`) is locked with
+  `db.refresh(conto, with_for_update=True)` before it is modified. SQLite ignores
+  FOR UPDATE, so tests don't catch a missing lock — review it.
 - `tests/test_saldi_e_idempotenza.py` walks every balance path and asserts the check
   stays clean: extend it when you add a new one.
 
