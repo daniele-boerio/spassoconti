@@ -1,11 +1,18 @@
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../../store/store";
 import { getPendingProposals } from "../../features/bank_proposals/api_calls";
 import { selectBankProposals } from "../../features/bank_proposals/bank_proposals_slice";
 import { getConti } from "../../features/conti/api_calls";
 import { getCategorie } from "../../features/categorie/api_calls";
 import { getTags } from "../../features/tags/api_calls";
-import BankProposalsDialog from "../dialog/bank_proposals_dialog/bank_proposals_dialog";
+import { lazyWithRetry } from "../../services/lazy_with_retry";
+
+// Caricato solo quando ci sono proposte: importato subito portava nel bundle
+// iniziale Dropdown e VirtualScroller di PrimeReact (~15 KB gzip) per un
+// dialog che la maggior parte delle volte non si apre.
+const BankProposalsDialog = lazyWithRetry(
+  () => import("../dialog/bank_proposals_dialog/bank_proposals_dialog"),
+);
 
 /**
  * Montato nell'area autenticata: al landing chiede al BE se ci sono proposte
@@ -31,7 +38,11 @@ export default function BankProposalsGate() {
     else setOpen(false);
   }, [proposals.length]);
 
+  if (!open) return null;
+
   return (
-    <BankProposalsDialog visible={open} onHide={() => setOpen(false)} />
+    <Suspense fallback={null}>
+      <BankProposalsDialog visible onHide={() => setOpen(false)} />
+    </Suspense>
   );
 }
