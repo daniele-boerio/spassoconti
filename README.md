@@ -22,8 +22,9 @@ Coolify pubblica `docker-compose.yml` come un'unica applicazione:
   `DB_PORT=5432`: la porta pubblica del DB è chiusa.
 
 Le variabili da impostare su Coolify sono elencate nel servizio `backend` di
-`docker-compose.yml` e spiegate in `backend/.env.example`. La chiave privata di
-Enable Banking è un file montato su `/app/secrets/enablebanking_private.pem`.
+`docker-compose.yml` e spiegate in `backend/.env.example`. Le variabili
+`ENABLE_BANKING_*` / `BANK_CONNECTOR_*` (connessione automatica dei conti) non
+servono: la funzione non è in uso.
 
 ## Sviluppo in locale
 

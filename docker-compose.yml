@@ -44,10 +44,11 @@ services:
       - FRONTEND_URL=${FRONTEND_URL:-https://conti.spassocasa.it}
       # Lo scheduler gira in-process: un solo backend deve averlo acceso.
       - RUN_SCHEDULER=${RUN_SCHEDULER:-true}
-      # Open Banking (solo l'utente admin). La chiave privata è un file montato da
-      # Coolify (Storages → file mount su /app/secrets/enablebanking_private.pem).
+      # Open Banking (connessione automatica dei conti, solo l'utente admin): oggi
+      # non usato, quindi tutto vuoto e nessun file .pem da montare. Per riattivarlo
+      # serve la chiave privata, inline o come file montato da Coolify + il suo path.
       - ENABLE_BANKING_APP_ID=${ENABLE_BANKING_APP_ID:-}
-      - ENABLE_BANKING_PRIVATE_KEY_PATH=${ENABLE_BANKING_PRIVATE_KEY_PATH:-/app/secrets/enablebanking_private.pem}
+      - ENABLE_BANKING_PRIVATE_KEY_PATH=${ENABLE_BANKING_PRIVATE_KEY_PATH:-}
       - ENABLE_BANKING_PRIVATE_KEY=${ENABLE_BANKING_PRIVATE_KEY:-}
       - ENABLE_BANKING_BASE_URL=${ENABLE_BANKING_BASE_URL:-https://api.enablebanking.com}
       - OPEN_BANKING_ADMIN_EMAIL=${OPEN_BANKING_ADMIN_EMAIL:-}
