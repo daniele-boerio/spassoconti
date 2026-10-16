@@ -20,6 +20,12 @@ type ChipProps = {
   /** Valore a destra dell'etichetta (importo di una sottocategoria, conteggio). */
   meta?: ReactNode;
   onClick?: () => void;
+  /**
+   * Chip-interruttore (filtri): selezionato o no. Diventa aria-pressed, così
+   * con VoiceOver si sa quali filtri sono attivi e non solo a colpo d'occhio.
+   * Va passato con la stessa condizione del variant selezionato.
+   */
+  pressed?: boolean;
   className?: string;
 };
 
@@ -29,6 +35,7 @@ export default function Chip({
   icon,
   meta,
   onClick,
+  pressed,
   className,
 }: ChipProps) {
   const content = (
@@ -44,7 +51,12 @@ export default function Chip({
   if (!onClick) return <span className={classes}>{content}</span>;
 
   return (
-    <button type="button" className={classes} onClick={onClick}>
+    <button
+      type="button"
+      className={classes}
+      onClick={onClick}
+      aria-pressed={pressed}
+    >
       {content}
     </button>
   );

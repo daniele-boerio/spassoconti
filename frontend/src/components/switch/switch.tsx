@@ -1,3 +1,4 @@
+import { useId } from "react";
 import {
   InputSwitch as SwitchPrime,
   type InputSwitchChangeEvent,
@@ -15,11 +16,20 @@ export type SwitchProps = {
 };
 
 export default function Switch(props: SwitchProps) {
+  // L'etichetta è un <label> collegato all'input (prima un <p> scollegato:
+  // VoiceOver leggeva "interruttore" senza dire quale).
+  const generatedId = useId();
+  const inputId = props.id ?? generatedId;
+
   return (
     <div className={`div-switch ${props.className ?? ""}`}>
-      {props.label && <p className="label-switch">{props.label}</p>}
+      {props.label && (
+        <label className="label-switch" htmlFor={inputId}>
+          {props.label}
+        </label>
+      )}
       <SwitchPrime
-        id={props.id}
+        inputId={inputId}
         checked={props.checked || false}
         onChange={props.onChange}
         disabled={props.disabled}

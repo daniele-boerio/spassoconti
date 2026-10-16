@@ -230,6 +230,7 @@ export default function FiltersSheet({
               key={preset}
               label={t(PERIOD_LABEL_KEYS[preset])}
               variant={period === preset ? "accent" : "solid"}
+              pressed={period === preset}
               onClick={() => dispatch(setPeriod(preset))}
             />
           ))}
@@ -303,6 +304,7 @@ export default function FiltersSheet({
                 label={conto.nome}
                 icon={isOn("conto_id", conto.id) ? "ph-bold ph-check" : undefined}
                 variant={isOn("conto_id", conto.id) ? "accent" : "solid"}
+                pressed={isOn("conto_id", conto.id)}
                 onClick={() => toggleIn("conto_id", conto.id)}
               />
             ))}
@@ -321,6 +323,7 @@ export default function FiltersSheet({
                   isOn("categoria_id", categoria.id) ? "ph-bold ph-check" : undefined
                 }
                 variant={isOn("categoria_id", categoria.id) ? "accent" : "solid"}
+                pressed={isOn("categoria_id", categoria.id)}
                 onClick={() => toggleCategoria(categoria.id)}
               />
             ))}
@@ -357,6 +360,7 @@ export default function FiltersSheet({
                 label={tag.nome}
                 icon={isOn("tag_id", tag.id) ? "ph-bold ph-check" : undefined}
                 variant={isOn("tag_id", tag.id) ? "accent" : "solid"}
+                pressed={isOn("tag_id", tag.id)}
                 onClick={() => toggleIn("tag_id", tag.id)}
               />
             ))}

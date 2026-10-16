@@ -15,7 +15,7 @@
   --surface-2: #eef1f0;
   --ink: #12211c;
   --muted: #5d6b65;
-  --muted-2: #68786f;
+  --muted-2: #5f6e67; /* era #68786f: 4,1:1 su surface-2, ora ≥ 4,6 (WCAG 1.4.3) */
   --line: #e8ecea;
   --line-soft: #f1f4f3;
 
@@ -28,7 +28,7 @@
 
   --positive: #0e7c5a;
   --positive-soft: #e4f2ec;
-  --negative: #c2513c;
+  --negative: #b0452f; /* era #c2513c: 4,0:1 su negative-soft, ora ≥ 4,8 */
   --negative-soft: #f4ece7;
   // Bordo delle card di allerta (ricorrenze scadute, righe da rivedere).
   --negative-line: #eddcd4;
@@ -160,7 +160,7 @@
   --surface-2: #16294a;
   --ink: #eaf0f8;
   --muted: #8fa2bd;
-  --muted-2: #6a7d99;
+  --muted-2: #8a9cb6; /* era #6a7d99: 3,5:1 su surface-2, ora ≥ 4,7 */
   --line: rgba(255, 255, 255, 0.1);
   --line-soft: rgba(255, 255, 255, 0.06);
 

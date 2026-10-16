@@ -2,6 +2,7 @@ import { Menu } from "primereact/menu";
 import type { MenuItem } from "primereact/menuitem";
 import { OverlayPanel } from "primereact/overlaypanel";
 import { useEffect, useRef, useState } from "react";
+import { useI18n } from "../../i18n/use-i18n";
 import "./three_dots_action_menu.scss";
 
 export type ThreeDotsActionsMenuProps = {
@@ -12,6 +13,7 @@ export type ThreeDotsActionsMenuProps = {
 };
 
 export default function ThreeDotsActionsMenu(props: ThreeDotsActionsMenuProps) {
+  const { t } = useI18n();
   const [items, setItems] = useState<MenuItem[]>([]);
   const ref = useRef<OverlayPanel>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -70,7 +72,11 @@ export default function ThreeDotsActionsMenu(props: ThreeDotsActionsMenuProps) {
     <div className={`three-dots ${props.className ?? ""}`}>
       <button
         ref={buttonRef}
+        type="button"
         className="p-button p-button-text"
+        // Solo icona: senza nome VoiceOver leggeva "pulsante" e basta.
+        aria-label={t("actions")}
+        aria-haspopup="menu"
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -83,6 +89,7 @@ export default function ThreeDotsActionsMenu(props: ThreeDotsActionsMenuProps) {
         }}
       >
         <i
+          aria-hidden="true"
           className="ph-bold ph-dots-three-vertical"
           style={{ transform: `rotate(${props.verticalDots ? "0" : "90"}deg)` }}
         />

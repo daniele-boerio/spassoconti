@@ -99,6 +99,7 @@ export default function AnalysisFiltersSheet({
               key={value}
               label={String(value)}
               variant={value === year ? "accent" : "solid"}
+              pressed={value === year}
               onClick={() => onChange({ year: value })}
             />
           ))}
@@ -115,6 +116,7 @@ export default function AnalysisFiltersSheet({
                 className="analysis-filters__month"
                 label={monthName(value)}
                 variant={value === month ? "accent" : "solid"}
+                pressed={value === month}
                 onClick={() => onChange({ month: value })}
               />
             ))}
@@ -129,6 +131,7 @@ export default function AnalysisFiltersSheet({
             <Chip
               label={t("mov_type_all")}
               variant={categoriaId ? "solid" : "accent"}
+              pressed={!(categoriaId)}
               onClick={() => onChange({ categoria: null })}
             />
 
@@ -168,6 +171,7 @@ export default function AnalysisFiltersSheet({
             <Chip
               label={t("mov_type_all")}
               variant={sottocategoriaIds.length > 0 ? "solid" : "accent"}
+              pressed={!(sottocategoriaIds.length > 0)}
               onClick={() => onChange({ sottocategorie: [] })}
             />
 
@@ -177,6 +181,7 @@ export default function AnalysisFiltersSheet({
                 label={sotto.nome}
                 icon={isOn(sotto.id) ? "ph-bold ph-check" : undefined}
                 variant={isOn(sotto.id) ? "accent" : "solid"}
+                pressed={isOn(sotto.id)}
                 onClick={() => toggle(sotto.id)}
               />
             ))}
@@ -191,6 +196,7 @@ export default function AnalysisFiltersSheet({
             <Chip
               label={t("mov_type_all")}
               variant={tagId ? "solid" : "accent"}
+              pressed={!(tagId)}
               onClick={() => onChange({ tag: null })}
             />
 
@@ -199,6 +205,7 @@ export default function AnalysisFiltersSheet({
                 key={tag.id}
                 label={tag.nome}
                 variant={String(tag.id) === String(tagId) ? "accent" : "solid"}
+                pressed={String(tag.id) === String(tagId)}
                 onClick={() => onChange({ tag: tag.id })}
               />
             ))}

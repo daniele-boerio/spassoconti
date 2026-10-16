@@ -46,7 +46,11 @@ export default function TabBar() {
       to={tab.to}
       end={tab.to === "/"}
       className="tab-bar__slot"
-      aria-label={t(tab.labelKey)}
+      // Il testo visibile deve stare nel nome accessibile (WCAG 2.5.3): chi usa
+      // il comando vocale dice "Titoli", quello che legge sullo schermo.
+      aria-label={
+        tab.shortKey ? `${t(tab.shortKey)} – ${t(tab.labelKey)}` : t(tab.labelKey)
+      }
       title={t(tab.labelKey)}
     >
       <i className={tab.icon} aria-hidden="true" />

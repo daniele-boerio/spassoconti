@@ -196,6 +196,7 @@ export default function CategoryDetailPage() {
                 <Chip
                   label={t("category_detail_all")}
                   variant={sottocategoriaId ? "outline" : "active"}
+                  pressed={!(sottocategoriaId)}
                   onClick={() => filterBy(null)}
                 />
 
@@ -222,6 +223,7 @@ export default function CategoryDetailPage() {
                       key={sub.nome}
                       label={sub.nome}
                       variant={selezionata ? "active" : "outline"}
+                      pressed={selezionata}
                       meta={meta}
                       onClick={() => filterBy(String(sub.id))}
                     />

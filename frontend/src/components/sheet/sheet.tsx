@@ -1,6 +1,11 @@
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useI18n } from "../../i18n/use-i18n";
 import "./sheet.scss";
+
+// Gli elementi raggiungibili con Tab dentro lo sheet (per tenerci il fuoco).
+const FOCUSABLE =
+  'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
 // Oltre questa trascinata verso il basso lo sheet si chiude invece di tornare su.
 const DISMISS_THRESHOLD = 120;
@@ -38,6 +43,8 @@ export default function Sheet({
   heightPercent,
   className,
 }: SheetProps) {
+  const { t } = useI18n();
+  const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const dragStartY = useRef<number | null>(null);
   const [dragOffset, setDragOffset] = useState(0);
@@ -47,12 +54,45 @@ export default function Sheet({
   // Quanto schermo si mangia la tastiera. Zero quando è chiusa.
   const [keyboardInset, setKeyboardInset] = useState(0);
 
-  // Esc chiude, e il corpo dietro non deve scorrere.
+  // Esc chiude, Tab resta dentro lo sheet, e il corpo dietro non deve scorrere.
+  // Con due sheet aperti (un picker sopra un form) tastiera ed Esc li gestisce
+  // solo quello in cima: prima Esc li chiudeva tutti e due, e Tab poteva
+  // scappare sulla pagina dietro (aria-modal da solo non basta a tutti i
+  // lettori di schermo).
   useEffect(() => {
     if (!open) return;
 
+    const isTopmost = () => {
+      const panels = document.querySelectorAll(".sheet__panel");
+      return panels[panels.length - 1] === panelRef.current;
+    };
+
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (!isTopmost()) return;
+
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+
+      if (event.key !== "Tab" || !panelRef.current) return;
+      const focusables = Array.from(
+        panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE),
+      ).filter((el) => !el.hasAttribute("disabled") && el.offsetParent !== null);
+      if (focusables.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || active === panelRef.current)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
 
     const previousOverflow = document.body.style.overflow;
@@ -65,10 +105,19 @@ export default function Sheet({
     };
   }, [open, onClose]);
 
+  // All'apertura il fuoco va sul pannello; alla chiusura torna dove era (il
+  // bottone che l'ha aperto), invece di perdersi sul body.
   useEffect(() => {
-    if (open) {
-      panelRef.current?.focus();
-    }
+    if (!open) return;
+
+    const previous = document.activeElement;
+    panelRef.current?.focus();
+
+    return () => {
+      if (previous instanceof HTMLElement && previous.isConnected) {
+        previous.focus();
+      }
+    };
   }, [open]);
 
   // Con la tastiera aperta iOS non rimpicciolisce il viewport di layout: un
@@ -148,6 +197,7 @@ export default function Sheet({
         ref={panelRef}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
         tabIndex={-1}
         className={`sheet__panel ${keyboardInset ? "sheet__panel--keyboard" : ""} ${className ?? ""}`}
         style={{
@@ -168,7 +218,9 @@ export default function Sheet({
 
         {title && (
           <div className="sheet__header">
-            <h2 className="sheet__title">{title}</h2>
+            <h2 id={titleId} className="sheet__title">
+              {title}
+            </h2>
 
             <div className="sheet__actions">
               {action}
@@ -176,7 +228,7 @@ export default function Sheet({
                 type="button"
                 className="sheet__close"
                 onClick={onClose}
-                aria-label="close"
+                aria-label={t("close")}
               >
                 <i className="ph-bold ph-x" aria-hidden="true" />
               </button>

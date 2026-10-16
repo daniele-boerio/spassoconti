@@ -30,7 +30,12 @@ function Toast({ toast }: { toast: ToastItem }) {
   }, [dispatch, toast.id, toast.duration]);
 
   return (
-    <div className={`toast toast--${toast.variant}`} role="status">
+    // Il contenitore è già una live region (ToastHost): qui serve solo far
+    // interrompere la lettura per gli errori.
+    <div
+      className={`toast toast--${toast.variant}`}
+      role={toast.variant === "error" ? "alert" : undefined}
+    >
       <i className={`toast__icon ${ICONS[toast.variant]}`} aria-hidden="true" />
 
       <div className="toast__text">
@@ -65,10 +70,10 @@ function Toast({ toast }: { toast: ToastItem }) {
 export default function ToastHost() {
   const toasts = useAppSelector(selectToasts);
 
-  if (toasts.length === 0) return null;
-
+  // Sempre montato, anche vuoto: molti lettori di schermo annunciano solo ciò
+  // che entra in una live region che esisteva già, non una che compare piena.
   return createPortal(
-    <div className="toast-host">
+    <div className="toast-host" aria-live="polite" aria-relevant="additions">
       {toasts.map((toast) => (
         <Toast key={toast.id} toast={toast} />
       ))}
