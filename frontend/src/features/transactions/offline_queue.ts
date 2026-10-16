@@ -21,7 +21,28 @@ export interface QueuedTransaction {
   owner: string | null;
   params: CreateTransactionParams;
   queuedAt: string;
+  /** Invii tentati e falliti per un motivo passeggero (rete, server giù). */
+  attempts?: number;
+  /** Perché l'ultimo tentativo non è andato: "network" o "HTTP 503"… */
+  lastError?: string;
+  /**
+   * Rifiutato dal server (4xx definitivo): non si riprova da solo, ma non si
+   * butta nemmeno. Resta finché l'utente non sceglie Riprova o Elimina: prima
+   * veniva tolto dalla coda con un toast che bastava non vedere per perderlo.
+   */
+  failed?: { status: number; detail: string | null };
 }
+
+/** Dopo questi tentativi falliti il banner dice che il server non risponde. */
+export const STUCK_AFTER_ATTEMPTS = 3;
+
+/**
+ * Risposte per cui ha senso riprovare più tardi: server giù, sessione da
+ * rinnovare, timeout, conflitto o troppe richieste. Il resto dei 4xx è un
+ * "no" definitivo del server sul contenuto.
+ */
+export const isTransientStatus = (status: number): boolean =>
+  status >= 500 || [401, 408, 409, 425, 429].includes(status);
 
 const STORAGE_KEY = "offline_transactions_v1";
 
@@ -64,24 +85,74 @@ const isQueued = (value: unknown): value is QueuedTransaction => {
 };
 
 export const loadQueue = (): QueuedTransaction[] => {
+  let raw: string | null = null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed.filter(isQueued) : [];
   } catch {
+    // Illeggibile: il prossimo saveQueue lo sovrascriverebbe, e quei movimenti
+    // sparirebbero. Prima se ne tiene una copia da cui si possono recuperare.
+    // raw null = storage non disponibile (negato, o i test in Node): niente
+    // da salvare né da segnalare.
+    if (raw) {
+      try {
+        localStorage.setItem(`${STORAGE_KEY}_corrupt_${Date.now()}`, raw);
+      } catch {
+        // Storage pieno: non c'è niente di meglio da fare.
+      }
+      console.error("Coda offline illeggibile: salvata una copia di backup");
+    }
     return [];
   }
 };
 
-export const saveQueue = (queue: QueuedTransaction[]): void => {
+/**
+ * Scrive la coda sul telefono. `false` se lo storage è pieno o negato: la
+ * voce resta solo in memoria e si perde alla chiusura dell'app, quindi chi
+ * chiama lo deve far sapere (vedi `pendingNotSaved` nello slice).
+ */
+export const saveQueue = (queue: QueuedTransaction[]): boolean => {
   try {
     if (queue.length === 0) localStorage.removeItem(STORAGE_KEY);
     else localStorage.setItem(STORAGE_KEY, JSON.stringify(queue));
+    return true;
   } catch {
-    // Storage pieno o negato: la voce resta almeno nello stato in memoria.
+    return false;
   }
 };
+
+/** Segna il rifiuto definitivo del server: la voce resta, ma non riparte da sola. */
+export const markFailed = (
+  queue: QueuedTransaction[],
+  key: string,
+  failed: { status: number; detail: string | null },
+): QueuedTransaction[] =>
+  queue.map((queued) => (queued.key === key ? { ...queued, failed } : queued));
+
+/** Conta un tentativo andato a vuoto per un motivo passeggero. */
+export const markAttempt = (
+  queue: QueuedTransaction[],
+  key: string,
+  reason: string,
+): QueuedTransaction[] =>
+  queue.map((queued) =>
+    queued.key === key
+      ? { ...queued, attempts: (queued.attempts ?? 0) + 1, lastError: reason }
+      : queued,
+  );
+
+/** "Riprova": la voce rifiutata torna in coda da inviare. */
+export const clearFailure = (
+  queue: QueuedTransaction[],
+  key: string,
+): QueuedTransaction[] =>
+  queue.map((queued) =>
+    queued.key === key
+      ? { ...queued, failed: undefined, attempts: 0, lastError: undefined }
+      : queued,
+  );
 
 /** Aggiunge una voce; la stessa chiave non entra due volte. */
 export const enqueue = (
@@ -95,8 +166,14 @@ export const dequeue = (
   key: string,
 ): QueuedTransaction[] => queue.filter((queued) => queued.key !== key);
 
-/** Le voci che l'utente collegato può inviare. */
+/** Le voci dell'utente collegato (comprese quelle rifiutate, da mostrare). */
 export const queueOf = (
   queue: QueuedTransaction[],
   owner: string | null,
 ): QueuedTransaction[] => queue.filter((queued) => queued.owner === owner);
+
+/** Le voci che il flush deve provare a inviare: le rifiutate aspettano l'utente. */
+export const sendableOf = (
+  queue: QueuedTransaction[],
+  owner: string | null,
+): QueuedTransaction[] => queueOf(queue, owner).filter((queued) => !queued.failed);

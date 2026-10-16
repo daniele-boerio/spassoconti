@@ -22,10 +22,13 @@ import { RootState } from "../../store/store";
 import { PeriodPreset, periodRange } from "./period";
 import { DEFAULT_PERIOD } from "./filters_url";
 import {
+  clearFailure,
   dequeue,
   enqueue,
   isQueuedOffline,
   loadQueue,
+  markAttempt,
+  markFailed,
   QueuedTransaction,
   saveQueue,
 } from "./offline_queue";
@@ -37,6 +40,7 @@ const initialState: TransactionsState = {
   transactions: [],
   selectedTransaction: null,
   pending: loadQueue(),
+  pendingNotSaved: false,
   revision: 0,
   period: DEFAULT_PERIOD,
   pagination: {
@@ -102,6 +106,16 @@ const transactionsSlice = createSlice({
   name: "transactions",
   initialState,
   reducers: {
+    /** "Riprova" su un movimento rifiutato: torna fra quelli da inviare. */
+    retryPendingTransaction: (state, action: PayloadAction<string>) => {
+      state.pending = clearFailure(state.pending, action.payload);
+      state.pendingNotSaved = !saveQueue(state.pending);
+    },
+    /** "Elimina": l'utente rinuncia a un movimento rifiutato. */
+    discardPendingTransaction: (state, action: PayloadAction<string>) => {
+      state.pending = dequeue(state.pending, action.payload);
+      state.pendingNotSaved = !saveQueue(state.pending);
+    },
     updateFilters: (
       state,
       action: PayloadAction<Partial<TransactionsState["filters"]>>,
@@ -196,17 +210,24 @@ const transactionsSlice = createSlice({
 
         if (isQueuedOffline(payload) && payload?.item) {
           state.pending = enqueue(state.pending, payload.item);
-          saveQueue(state.pending);
+          state.pendingNotSaved = !saveQueue(state.pending);
         }
       })
 
       .addCase(flushOfflineTransactions.fulfilled, (state, action) => {
-        const { sent, dropped } = action.payload;
+        const { sent, failed, attempt } = action.payload;
 
-        for (const key of [...sent.map((item) => item.key), ...dropped]) {
+        for (const { key } of sent) {
           state.pending = dequeue(state.pending, key);
         }
-        saveQueue(state.pending);
+        // Rifiutati: restano, segnati, finché l'utente non sceglie (banner).
+        for (const { key, status, detail } of failed) {
+          state.pending = markFailed(state.pending, key, { status, detail });
+        }
+        if (attempt) {
+          state.pending = markAttempt(state.pending, attempt.key, attempt.reason);
+        }
+        state.pendingNotSaved = !saveQueue(state.pending);
 
         if (sent.length > 0) {
           state.pagination.total = (state.pagination.total || 0) + sent.length;
@@ -337,7 +358,17 @@ export const selectPendingTransactions = createSelector(
   (pending, owner) => pending.filter((item) => item.owner === owner),
 );
 
-export const { updateFilters, applyFilters, setPeriod, resetFilters } =
-  transactionsSlice.actions;
+export const {
+  updateFilters,
+  applyFilters,
+  setPeriod,
+  resetFilters,
+  retryPendingTransaction,
+  discardPendingTransaction,
+} = transactionsSlice.actions;
+
+/** `true` se la coda vive solo in memoria (storage pieno o negato). */
+export const selectPendingNotSaved = (state: RootState) =>
+  state.transaction.pendingNotSaved;
 
 export default transactionsSlice.reducer;

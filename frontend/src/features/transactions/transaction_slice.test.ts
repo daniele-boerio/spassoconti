@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import reducer, { mapTransaction } from "./transaction_slice";
+import reducer, {
+  discardPendingTransaction,
+  mapTransaction,
+  retryPendingTransaction,
+} from "./transaction_slice";
 import {
   createTransaction,
   flushOfflineTransactions,
@@ -154,7 +158,7 @@ describe("scritture sulla lista dei movimenti", () => {
     expect(next.transactions).toHaveLength(0);
   });
 
-  it("l'invio della coda toglie le voci e mostra i movimenti", () => {
+  it("l'invio della coda toglie gli inviati e tiene i rifiutati, segnati", () => {
     const state = {
       ...withList(0),
       pending: [
@@ -165,12 +169,61 @@ describe("scritture sulla lista dei movimenti", () => {
     const next = reducer(
       state,
       flushOfflineTransactions.fulfilled(
-        { sent: [{ key: "k1", transaction: tx("50", "2026-10-04") }], dropped: ["k2"] },
+        {
+          sent: [{ key: "k1", transaction: tx("50", "2026-10-04") }],
+          failed: [{ key: "k2", status: 400, detail: "Conto inesistente" }],
+          attempt: null,
+        },
         "req",
       ),
     );
-    expect(next.pending).toEqual([]);
+    // Il rifiutato non sparisce: aspetta Riprova o Elimina dall'utente
+    expect(next.pending.map((p) => p.key)).toEqual(["k2"]);
+    expect(next.pending[0].failed).toEqual({ status: 400, detail: "Conto inesistente" });
     expect(next.transactions.map((t) => t.id)).toEqual(["50"]);
+  });
+
+  it("un errore passeggero conta il tentativo e lascia la voce da inviare", () => {
+    const state = {
+      ...withList(0),
+      pending: [{ key: "k1", owner: "mario", params, queuedAt: "x", attempts: 2 }],
+    };
+    const next = reducer(
+      state,
+      flushOfflineTransactions.fulfilled(
+        { sent: [], failed: [], attempt: { key: "k1", reason: "HTTP 503" } },
+        "req",
+      ),
+    );
+    expect(next.pending[0]).toMatchObject({ attempts: 3, lastError: "HTTP 503" });
+    expect(next.pending[0].failed).toBeUndefined();
+  });
+
+  it("Riprova rimette in coda un rifiutato, Elimina lo toglie", () => {
+    const state = {
+      ...withList(0),
+      pending: [
+        {
+          key: "k1",
+          owner: "mario",
+          params,
+          queuedAt: "x",
+          failed: { status: 400, detail: null },
+        },
+        {
+          key: "k2",
+          owner: "mario",
+          params,
+          queuedAt: "x",
+          failed: { status: 422, detail: null },
+        },
+      ],
+    };
+    const ripreso = reducer(state, retryPendingTransaction("k1"));
+    expect(ripreso.pending.find((p) => p.key === "k1")?.failed).toBeUndefined();
+
+    const eliminato = reducer(ripreso, discardPendingTransaction("k2"));
+    expect(eliminato.pending.map((p) => p.key)).toEqual(["k1"]);
   });
 
   it("ogni scrittura riuscita fa avanzare la revisione", () => {

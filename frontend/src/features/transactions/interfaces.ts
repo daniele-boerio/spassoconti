@@ -60,6 +60,12 @@ export interface TransactionsState {
   /** Movimenti salvati senza rete, in attesa di invio (vedi offline_queue.ts). */
   pending: QueuedTransaction[];
   /**
+   * La coda non si è potuta scrivere sul telefono (storage pieno o negato): i
+   * movimenti in `pending` esistono solo in memoria e si perdono alla chiusura
+   * dell'app. Il banner lo dice.
+   */
+  pendingNotSaved: boolean;
+  /**
    * Sale a ogni scrittura riuscita (crea, modifica, elimina, dividi, invio
    * della coda). Le pagine che tengono una lista propria, fuori dallo store,
    * lo mettono fra le dipendenze del caricamento per non restare indietro.

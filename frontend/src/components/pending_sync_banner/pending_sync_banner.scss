@@ -1,5 +1,11 @@
 @use "../../styles/variables" as v;
 
+.pending-sync-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .pending-sync {
   display: flex;
   align-items: center;
@@ -20,5 +26,42 @@
     min-width: 0;
     font-size: 14px;
     color: v.$ink;
+  }
+
+  // Il motivo del rifiuto, sotto il nome del movimento
+  &__detail {
+    display: block;
+    margin-top: 2px;
+    font-size: 13px;
+    color: v.$muted;
+  }
+
+  &__actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  // Rifiutato o non salvato: va visto, non è un "in attesa"
+  &--error {
+    border-style: solid;
+    border-color: v.$negative-line;
+    background: v.$negative-soft;
+
+    .pending-sync__icon {
+      color: v.$negative;
+    }
+  }
+
+  // Su telefono i due pulsanti vanno sotto il testo
+  @media (max-width: 480px) {
+    &--error {
+      flex-wrap: wrap;
+    }
+
+    &--error &__actions {
+      width: 100%;
+      justify-content: flex-end;
+    }
   }
 }

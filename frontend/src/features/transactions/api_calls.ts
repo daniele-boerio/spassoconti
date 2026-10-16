@@ -25,10 +25,11 @@ import { saveFile } from "../../services/save_file";
 import { t } from "../../i18n";
 import {
   isNetworkError,
+  isTransientStatus,
   newIdempotencyKey,
   QUEUED_OFFLINE,
   QueuedTransaction,
-  queueOf,
+  sendableOf,
 } from "./offline_queue";
 
 /**
@@ -270,28 +271,35 @@ export const createTransaction = createAsyncThunk<
  *
  * - inviato (o già arrivato in un tentativo precedente: lo dice la chiave di
  *   idempotenza) → esce dalla coda;
- * - rifiutato dal server con un 4xx → esce dalla coda e l'errore si mostra:
- *   riprovarlo darebbe sempre lo stesso no;
- * - rete ancora assente o 5xx → resta, e ci si ferma qui fino alla prossima.
+ * - rifiutato dal server con un 4xx definitivo → resta in coda segnato come
+ *   rifiutato (non riparte da solo) e l'errore si mostra; dal banner l'utente
+ *   sceglie Riprova o Elimina. Prima veniva buttato via;
+ * - rete assente o errore passeggero (5xx, 401, 408, 409, 429) → resta, si
+ *   conta il tentativo e ci si ferma qui fino alla prossima.
  *
  * Non sta sotto il prefisso "transazioni/" apposta: non deve accendere lo
  * spinner della lista mentre lavora in sottofondo.
  */
 export const flushOfflineTransactions = createAsyncThunk<
-  { sent: { key: string; transaction: Transaction }[]; dropped: string[] },
+  {
+    sent: { key: string; transaction: Transaction }[];
+    failed: { key: string; status: number; detail: string | null }[];
+    attempt: { key: string; reason: string } | null;
+  },
   void,
   { state: RootState }
 >(
   "offline/flushTransactions",
   async (_, { getState, dispatch }) => {
     const state = getState();
-    const queue = queueOf(
+    const queue = sendableOf(
       state.transaction.pending,
       state.profile.username ?? null,
     );
 
     const sent: { key: string; transaction: Transaction }[] = [];
-    const dropped: string[] = [];
+    const failed: { key: string; status: number; detail: string | null }[] = [];
+    let attempt: { key: string; reason: string } | null = null;
 
     flushing = true;
     try {
@@ -304,15 +312,22 @@ export const flushOfflineTransactions = createAsyncThunk<
           );
           sent.push({ key: item.key, transaction: response.data });
         } catch (error) {
-          if (isNetworkError(error)) break;
+          if (isNetworkError(error)) {
+            attempt = { key: item.key, reason: "network" };
+            break;
+          }
 
           const status = (error as AxiosError).response?.status ?? 0;
-          if (status >= 500 || status === 401 || status === 429) break;
+          if (isTransientStatus(status)) {
+            attempt = { key: item.key, reason: `HTTP ${status}` };
+            break;
+          }
 
           // Il body è già normalizzato da services/api.js: `detail` è leggibile.
-          dropped.push(item.key);
-          const detail = (error as AxiosError<{ detail?: string }>).response
-            ?.data?.detail;
+          const detail =
+            (error as AxiosError<{ detail?: string }>).response?.data?.detail ??
+            null;
+          failed.push({ key: item.key, status, detail });
           dispatch(
             showError({
               title: t("offline_rejected_title"),
@@ -332,7 +347,7 @@ export const flushOfflineTransactions = createAsyncThunk<
       await refreshMonthlyTotals(dispatch);
     }
 
-    return { sent, dropped };
+    return { sent, failed, attempt };
   },
   {
     // Un invio alla volta: due flush in parallelo manderebbero le stesse voci
@@ -340,7 +355,7 @@ export const flushOfflineTransactions = createAsyncThunk<
     // errore: l'errorMiddleware ignora i rejected per `condition`.
     condition: (_, { getState }) =>
       !flushing &&
-      queueOf(
+      sendableOf(
         getState().transaction.pending,
         getState().profile.username ?? null,
       ).length > 0,

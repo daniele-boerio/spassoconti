@@ -5,8 +5,9 @@
 # /api/health interroga il database, quindi "verde" vuol dire app + BE + DB vivi.
 #
 # Avviso: un run fallito manda una mail di GitHub (Settings → Notifications →
-# Actions: "Only notify for failed workflows"). Tre tentativi a 30s di distanza
-# prima di dichiarare il guasto, così un deploy in corso non fa scattare l'allarme.
+# Actions: "Only notify for failed workflows"). Quattro tentativi a 30s di distanza
+# prima di dichiarare il guasto: un deploy spegne i container per circa un minuto
+# (lo stack compose non fa rolling update) e non deve far scattare l'allarme.
 #
 # NB: GitHub sospende i workflow programmati di un repo pubblico dopo 60 giorni
 # senza commit; in quel caso arriva una mail e si riattiva da Actions → Uptime.
@@ -26,7 +27,7 @@ jobs:
         run: |
           url="https://conti.spassocasa.it/api/health"
           expected='{"status":"ok","database":"ok"}'
-          for attempt in 1 2 3; do
+          for attempt in 1 2 3 4; do
             body=$(curl -s --max-time 15 -w '\n%{http_code}' "$url" || true)
             code=$(echo "$body" | tail -n1)
             json=$(echo "$body" | head -n -1)
@@ -35,7 +36,7 @@ jobs:
               exit 0
             fi
             echo "::warning::tentativo $attempt: HTTP $code — $json"
-            [ "$attempt" -lt 3 ] && sleep 30
+            [ "$attempt" -lt 4 ] && sleep 30
           done
           echo "::error::conti.spassocasa.it non risponde come dovrebbe (ultimo: HTTP $code — $json)"
           exit 1

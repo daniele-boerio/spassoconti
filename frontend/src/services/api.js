@@ -94,8 +94,25 @@ api.interceptors.response.use(
       originalRequest.headers.Authorization = `Bearer ${newToken}`;
       return api(originalRequest);
     } catch (refreshError) {
-      // Refresh fallito: cookie scaduto o revocato. La sessione è chiusa.
-      clearSession();
+      const refreshStatus = refreshError.response?.status;
+
+      // 409: un'altra scheda ha rinnovato la sessione nello stesso istante. Il
+      // cookie nuovo è già nel browser e il token nuovo in localStorage (che le
+      // schede condividono): si riprova con quello, senza buttare fuori nessuno.
+      if (refreshStatus === 409) {
+        const sharedToken = localStorage.getItem("token");
+        if (sharedToken) {
+          originalRequest.headers.Authorization = `Bearer ${sharedToken}`;
+          return api(originalRequest);
+        }
+      }
+
+      // Solo un "no" esplicito del server chiude la sessione: cookie scaduto o
+      // revocato. Senza rete o con il server giù la sessione è ancora buona, e
+      // cancellarla vorrebbe dire rifare il login per un problema passeggero.
+      if (refreshStatus === 401 || refreshStatus === 403) {
+        clearSession();
+      }
       return Promise.reject(refreshError);
     }
   },
