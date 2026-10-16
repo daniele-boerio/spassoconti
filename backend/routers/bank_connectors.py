@@ -23,7 +23,8 @@ from schemas.bank_transaction import (
     BankTransactionProposalImport,
 )
 from schemas.transazione import TransazioneOut
-from models import Conto, BankTransactionProposal, Categoria, Sottocategoria
+from models import Conto, BankTransactionProposal
+from routers.transazioni import resolve_tassonomia, update_category_usage
 from services import (
     fetch_bank_transactions_for_conto,
     create_bank_transaction_proposal,
@@ -162,6 +163,8 @@ def sync_bank_connector(
 
 
 _STATEMENT_EXTS = (".pdf", ".xlsx", ".xls", ".csv")
+# Un estratto conto vero pesa qualche centinaio di KB (nginx accetta fino a 20 MB).
+MAX_STATEMENT_BYTES = 5 * 1024 * 1024
 
 
 @router.post("/import-statement", response_model=BankStatementImportResponse)
@@ -191,7 +194,15 @@ def import_bank_statement(
             detail="The file must be a PDF, Excel (.xlsx) or CSV",
         )
 
-    file_bytes = file.file.read()
+    # Un tetto prima del parsing: pdfplumber/openpyxl su un file enorme (o su uno
+    # zip bomb travestito da .xlsx) si mangerebbero RAM e CPU del backend. Si
+    # legge un byte oltre il limite per sapere se lo supera, senza caricarlo tutto.
+    file_bytes = file.file.read(MAX_STATEMENT_BYTES + 1)
+    if len(file_bytes) > MAX_STATEMENT_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="The statement file is too large (max 5 MB)",
+        )
     if not file_bytes:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -273,20 +284,6 @@ def get_bank_transaction_proposals(
     return proposals
 
 
-def update_category_usage(
-    db: Session, categoria_id: int = None, sottocategoria_id: int = None
-):
-    now = datetime.now(timezone.utc)
-    if categoria_id:
-        db.query(Categoria).filter(Categoria.id == categoria_id).update(
-            {"lastImport": now}
-        )
-    if sottocategoria_id:
-        db.query(Sottocategoria).filter(Sottocategoria.id == sottocategoria_id).update(
-            {"lastImport": now}
-        )
-
-
 @router.post("/proposals/{proposal_id}/import", response_model=TransazioneOut)
 def import_bank_transaction_proposal_endpoint(
     conto_id: int,
@@ -317,6 +314,17 @@ def import_bank_transaction_proposal_endpoint(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Only PENDING proposals can be imported",
         )
+
+    # Come in ogni altra scrittura (vedi resolve_tassonomia): categoria,
+    # sottocategoria e tag arrivano dal client e devono essere dell'utente,
+    # altrimenti il movimento importato referenzierebbe la tassonomia di un altro.
+    resolve_tassonomia(
+        db,
+        current_user_id,
+        import_data.categoria_id,
+        import_data.sottocategoria_id,
+        import_data.tag_id,
+    )
 
     try:
         new_trans = import_bank_transaction_proposal(

@@ -1212,10 +1212,12 @@ def fetch_bank_transactions_for_conto(db, conto):
         transactions = fetch_enable_banking_transactions(
             conto.bank_connector_account_id, since, until
         )
+        # Niente commit qui: last_sync si salva insieme alle proposte (lo fa
+        # chi chiama). Committato prima, se la creazione delle proposte falliva
+        # il giro dopo ripartiva da qui e quei movimenti non tornavano più.
         conto.bank_connector_last_sync = datetime.now()
         conto.bank_connector_last_error = None
         db.add(conto)
-        db.commit()
         return transactions
     elif conto.bank_connector_provider == "NORDIGEN":
         if (
@@ -1260,10 +1262,12 @@ def fetch_bank_transactions_for_conto(db, conto):
         if refresh_token:
             conto.bank_connector_refresh_token = encrypt_token(refresh_token)
 
+        # Niente commit qui: last_sync si salva insieme alle proposte (lo fa
+        # chi chiama). Committato prima, se la creazione delle proposte falliva
+        # il giro dopo ripartiva da qui e quei movimenti non tornavano più.
         conto.bank_connector_last_sync = datetime.now()
         conto.bank_connector_last_error = None
         db.add(conto)
-        db.commit()
         return transactions
     elif conto.bank_connector_provider == "MOCK":
         return [
@@ -1403,6 +1407,7 @@ def task_sync_bank_connectors():
                 if datetime.now() - last_naive < timedelta(hours=5):
                     continue
 
+            conto_id = conto.id
             try:
                 candidates = fetch_bank_transactions_for_conto(db, conto)
                 proposals_created = 0
@@ -1411,21 +1416,31 @@ def task_sync_bank_connectors():
                         db, conto.user_id, conto, candidate
                     ):
                         proposals_created += 1
+                # Un commit per conto: last_sync e proposte insieme, o nessuno dei due.
+                db.commit()
                 if proposals_created:
                     logger.info(
-                        f"Bank sync for conto {conto.id}: created {proposals_created} proposals"
+                        "Bank sync for conto %s: created %s proposals",
+                        conto_id,
+                        proposals_created,
                     )
             except Exception as e:
-                conto.bank_connector_last_error = str(e)
-                db.add(conto)
-                db.commit()
-                logger.error(f"Bank sync failed for conto {conto.id}: {e}")
+                # Prima il rollback: con un errore del DB la sessione resta
+                # inutilizzabile, il commit di last_error rilanciava e tutti i
+                # conti successivi venivano saltati.
+                db.rollback()
+                logger.exception("Bank sync failed for conto %s", conto_id)
+                try:
+                    conto = db.get(models.Conto, conto_id)
+                    conto.bank_connector_last_error = str(e)[:500]
+                    db.commit()
+                except Exception:
+                    db.rollback()
+                    logger.exception("Impossibile salvare l'errore del conto %s", conto_id)
                 continue
-
-        db.commit()
-    except Exception as e:
+    except Exception:
         db.rollback()
-        logger.error(f"Fatal error in task_sync_bank_connectors: {e}")
+        logger.exception("Fatal error in task_sync_bank_connectors")
     finally:
         db.close()
 
@@ -1622,9 +1637,20 @@ def extract_pdf_text(file_bytes: bytes) -> str:
 
     parts: list[str] = []
     with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+        # Un estratto conto è qualche pagina: oltre il tetto è un file sbagliato
+        # (o costruito per tenere occupata la CPU), e non lo si legge.
+        if len(pdf.pages) > MAX_STATEMENT_PDF_PAGES:
+            raise ValueError(
+                f"il PDF ha {len(pdf.pages)} pagine, il massimo è {MAX_STATEMENT_PDF_PAGES}"
+            )
         for page in pdf.pages:
             parts.append(page.extract_text() or "")
     return "\n".join(parts)
+
+
+# Tetti per l'import di un estratto conto (vedi anche MAX_STATEMENT_BYTES nel router).
+MAX_STATEMENT_PDF_PAGES = 50
+MAX_STATEMENT_ROWS = 20_000
 
 
 def parse_bank_statement_pdf(
@@ -1796,7 +1822,16 @@ def _read_xlsx_rows(file_bytes: bytes) -> list:
     )
     try:
         ws = wb.active
-        return [list(r) for r in ws.iter_rows(values_only=True)]
+        # read_only legge riga per riga: ci si ferma al tetto invece di espandere
+        # un foglio (o uno zip) gonfiato fino a riempire la RAM.
+        righe = []
+        for r in ws.iter_rows(values_only=True):
+            if len(righe) >= MAX_STATEMENT_ROWS:
+                raise ValueError(
+                    f"il foglio ha più di {MAX_STATEMENT_ROWS} righe"
+                )
+            righe.append(list(r))
+        return righe
     finally:
         wb.close()
 
