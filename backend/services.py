@@ -8,7 +8,7 @@ import time
 import requests
 import yfinance as yf
 from cryptography.fernet import Fernet, InvalidToken
-from jose import jwt
+import jwt  # PyJWT (vedi auth.py: python-jose è stato tolto)
 from datetime import date, timedelta, datetime, timezone
 import logging
 from database import SessionLocal

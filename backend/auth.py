@@ -5,7 +5,10 @@ import logging
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
-from jose import jwt, JWTError
+# PyJWT e non python-jose: jose è fermo, e fino alla 3.5.0 accetta chiavi
+# pubbliche come segreto HMAC (CVE-2026-85394, nessuna versione corretta).
+import jwt
+from jwt import PyJWTError
 from fastapi import Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
@@ -303,7 +306,7 @@ def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(secu
 
         return user_id
 
-    except JWTError:
+    except PyJWTError:
         logger.debug("Token JWT non valido", exc_info=True)
         raise credentials_exception
 
