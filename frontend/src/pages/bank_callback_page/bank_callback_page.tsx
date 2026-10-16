@@ -9,6 +9,14 @@ import Button from "../../components/legacy_button/legacy_button";
 
 type CallbackStatus = "loading" | "success" | "error";
 
+// Il `code` della banca è monouso, e questa pagina è montata in due alberi di
+// rotte (utente non ancora autenticato / autenticato): quando la sessione si
+// ripristina a metà, React la rimonta e il `useRef` riparte da capo. Una
+// seconda conferma con lo stesso code fallisce e mostrava un errore dopo un
+// collegamento riuscito. La conferma vive qui, fuori dal componente: chi
+// rimonta si aggancia alla stessa richiesta invece di farne un'altra.
+const conferme = new Map<string, Promise<unknown>>();
+
 export default function BankCallbackPage() {
   const { t } = useI18n();
   const dispatch = useAppDispatch();
@@ -40,8 +48,13 @@ export default function BankCallbackPage() {
       return;
     }
 
-    dispatch(confirmBankSession({ state, code }))
-      .unwrap()
+    let conferma = conferme.get(code);
+    if (!conferma) {
+      conferma = dispatch(confirmBankSession({ state, code })).unwrap();
+      conferme.set(code, conferma);
+    }
+
+    conferma
       .then(() => {
         setStatus("success");
         setMessage(t("bank_callback_success"));

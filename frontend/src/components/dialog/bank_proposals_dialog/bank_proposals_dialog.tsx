@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Dialog } from "primereact/dialog";
 import Dropdown from "../../dropdown/dropdown";
 import InputText from "../../input_text/input_text";
@@ -57,12 +57,19 @@ export default function BankProposalsDialog({ visible, onHide }: Props) {
   // Preseleziona il conto da cui arriva la proposta. Usa l'id reale del conto
   // trovato così il tipo combacia col Dropdown (le proposte hanno conto_id come
   // stringa, i conti come numero) e ricalcola quando la lista conti si carica.
+  // Una volta sola per proposta: dopo, ogni nuovo caricamento dei conti (ce n'è
+  // uno dopo ogni import) riportava la scelta al conto d'origine, e la proposta
+  // successiva finiva sul conto sbagliato se l'utente l'aveva cambiato.
+  const preselezionataPer = useRef<string | null>(null);
   useEffect(() => {
     if (!current) return;
+    if (preselezionataPer.current === String(current.id)) return;
     const match = conti.find(
       (c) => String(c.id) === String(current.conto_id),
     );
     setContoId(match ? (match.id as string) : current.conto_id);
+    // Finché i conti non sono arrivati la scelta resta provvisoria
+    if (match) preselezionataPer.current = String(current.id);
   }, [current?.id, conti]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const categorieFiltrate = useMemo(() => {
