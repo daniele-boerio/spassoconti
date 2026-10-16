@@ -1,0 +1,181 @@
+@use "../../../styles/variables" as v;
+
+.account-sheet {
+  &__section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  &__label {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: v.$muted;
+  }
+
+  &__hint {
+    font-size: 12px;
+    font-weight: 400;
+    color: v.$muted;
+  }
+
+  // Quattro tipi in griglia: due colonne si leggono meglio di una fila di
+  // quattro pillole strette.
+  &__types {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  &__type {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: v.$tap-target;
+    padding: 15px 16px;
+
+    border: 1.5px solid transparent;
+    border-radius: v.$r-field;
+    background: v.$bg;
+    color: v.$ink;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+
+    i {
+      font-size: 15px;
+      color: v.$muted;
+    }
+
+    &[aria-checked="true"] {
+      background: v.$accent-soft;
+      border-color: v.$accent;
+      color: v.$accent;
+      font-weight: 700;
+
+      i {
+        color: v.$accent;
+      }
+    }
+
+    &:active {
+      transform: scale(0.98);
+      transition: transform v.$dur-press;
+    }
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  &__control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: v.$tap-target;
+    padding: 15px 16px;
+
+    box-sizing: border-box;
+    border-radius: v.$r-field;
+    background: v.$bg;
+
+    input {
+      flex: 1;
+      min-width: 0;
+      border: 0;
+      background: transparent;
+      color: v.$ink;
+      font-family: inherit;
+      font-size: v.$fs-field;
+
+      &::placeholder {
+        color: v.$muted-2;
+      }
+
+      &:focus {
+        outline: none;
+      }
+
+      &[type="date"] {
+        font-weight: 600;
+
+        &::-webkit-calendar-picker-indicator {
+          display: none;
+        }
+      }
+    }
+  }
+
+  &__suffix {
+    flex: 0 0 auto;
+    font-size: 15px;
+    color: v.$muted-2;
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: v.$tap-target;
+    padding: 14px 16px;
+
+    border: 0;
+    border-radius: v.$r-field;
+    background: v.$bg;
+    color: inherit;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    i {
+      flex: 0 0 auto;
+      font-size: 12px;
+      color: v.$muted-2;
+    }
+  }
+
+  &__row-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__value {
+    font-size: 14.5px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    &--empty {
+      color: v.$muted-2;
+      font-weight: 500;
+    }
+  }
+
+  &__switch {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+
+    border-radius: v.$r-field;
+    background: v.$bg;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  &__switch-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+}

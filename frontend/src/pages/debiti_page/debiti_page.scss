@@ -1,0 +1,242 @@
+@use "../../styles/variables" as v;
+
+.debts {
+  &__header {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  &__top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  &__back {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: v.$tap-target;
+    height: v.$tap-target;
+    margin-left: -10px;
+
+    border: 0;
+    background: transparent;
+    color: v.$ink;
+    cursor: pointer;
+
+    i {
+      font-size: 16px;
+    }
+  }
+
+  &__summary {
+    gap: 14px;
+  }
+
+  &__summary-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  &__eyebrow {
+    @include v.eyebrow;
+    color: v.$muted;
+  }
+
+  &__counts {
+    font-size: 12.5px;
+    color: v.$muted;
+  }
+
+  &__residual {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -0.035em;
+  }
+
+  &__progress {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  &__legend {
+    font-size: 12.5px;
+    color: v.$muted;
+
+    strong {
+      color: v.$ink;
+    }
+
+    .amount {
+      font-size: inherit;
+      color: inherit;
+    }
+  }
+
+  &__list {
+    gap: 12px;
+  }
+
+  &__add {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 15px;
+
+    border: 1px dashed v.$line;
+    border-radius: 18px;
+    background: transparent;
+    color: v.$accent;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+
+    i {
+      font-size: 13px;
+    }
+  }
+}
+
+.debt {
+  gap: 16px;
+
+  // Un debito estinto è storia: resta leggibile ma non chiede attenzione.
+  &--closed {
+    opacity: 0.72;
+  }
+
+  &__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  &__closed-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  &__identity {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 7px;
+    min-width: 0;
+  }
+
+  &__name {
+    font-size: 15.5px;
+    font-weight: 700;
+  }
+
+  &__badge {
+    padding: 4px 9px;
+    border-radius: v.$r-pill;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+
+    &--open {
+      background: v.$negative-soft;
+      color: v.$negative;
+    }
+
+    &--paid {
+      background: v.$accent-soft;
+      color: v.$accent;
+    }
+  }
+
+  &__figures {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  &__residual {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  &__closed-value {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  &__of {
+    font-size: 12px;
+    color: v.$muted;
+
+    .amount {
+      font-size: inherit;
+      color: inherit;
+    }
+  }
+
+  &__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 12.5px;
+    color: v.$muted;
+  }
+
+  &__actions {
+    display: flex;
+    gap: 8px;
+    padding-top: 14px;
+    border-top: 1px solid v.$line-soft;
+  }
+
+  &__action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+
+    border: 0;
+    border-radius: 14px;
+    background: v.$surface-2;
+    color: v.$muted;
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+
+    i {
+      font-size: 13px;
+    }
+
+    &--primary {
+      flex: 1;
+      width: auto;
+      background: v.$accent;
+      color: v.$on-accent;
+    }
+
+    &--danger {
+      color: v.$negative;
+    }
+
+    &:active {
+      transform: scale(0.97);
+      transition: transform v.$dur-press;
+    }
+  }
+}

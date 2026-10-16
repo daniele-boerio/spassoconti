@@ -1,0 +1,59 @@
+@use "../../styles/variables" as v;
+
+.analysis-page {
+  &__header {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  &__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  // Una riga sola, scorrevole: i filtri accesi non devono mandare a capo
+  // l'intestazione.
+  &__chips {
+    display: flex;
+    gap: 8px;
+    margin: 0 calc(-1 * v.$gutter);
+    padding: 2px v.$gutter 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  &__period {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: v.$tap-target;
+    padding: 9px 14px;
+
+    border: 1px solid v.$line;
+    border-radius: v.$r-pill;
+    background: v.$surface;
+    color: v.$muted;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: capitalize;
+    cursor: pointer;
+
+    i {
+      font-size: 10px;
+    }
+
+    &:active {
+      transform: scale(0.97);
+      transition: transform v.$dur-press;
+    }
+  }
+}

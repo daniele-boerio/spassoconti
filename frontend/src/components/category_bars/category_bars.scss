@@ -1,0 +1,105 @@
+@use "../../styles/variables" as v;
+
+.category-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: v.$tap-target;
+
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: inherit;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:active {
+      transform: scale(0.99);
+      transition: transform v.$dur-press;
+    }
+  }
+
+  &__body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  &__line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 13.5px;
+  }
+
+  &__name {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__figure {
+    flex: 0 0 auto;
+    color: v.$muted;
+
+    strong .amount {
+      color: v.$ink;
+      font-weight: 700;
+    }
+  }
+
+  &__track {
+    display: block;
+    height: 6px;
+    border-radius: v.$r-pill;
+    background: v.$surface-2;
+    overflow: hidden;
+  }
+
+  // Le righe prendono la serie grafici nell'ordine e la riciclano ogni
+  // cinque: il colore dice la posizione in classifica, non la categoria.
+  &__fill {
+    display: block;
+    height: 100%;
+    border-radius: v.$r-pill;
+
+    &--1 {
+      background: v.$series-1;
+    }
+    &--2 {
+      background: v.$series-2;
+    }
+    &--3 {
+      background: v.$series-3;
+    }
+    &--4 {
+      background: v.$series-4;
+    }
+    &--5 {
+      background: v.$series-5;
+    }
+  }
+
+  &__chevron {
+    flex: 0 0 auto;
+    font-size: 11px;
+    color: v.$muted-2;
+  }
+
+  &__empty {
+    margin: 0;
+    font-size: 13.5px;
+    color: v.$muted;
+  }
+}

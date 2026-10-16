@@ -1,0 +1,122 @@
+@use "../../styles/variables" as v;
+
+// La griglia è una sola e la usano intestazione e righe: se si scollassero, le
+// colonne non sarebbero più incolonnate.
+$tx-grid: 34px minmax(0, 1.6fr) 170px 160px 130px 40px;
+
+.tx-head {
+  display: grid;
+  grid-template-columns: $tx-grid;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0 10px;
+  border-bottom: 1px solid v.$line;
+
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: v.$muted;
+
+  &__amount {
+    text-align: right;
+  }
+}
+
+.tx-row {
+  display: grid;
+  grid-template-columns: $tx-grid;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 11px 0;
+
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  & + & {
+    border-top: 1px solid v.$line-soft;
+  }
+
+  &:hover {
+    // Il fondo pagina dentro la card: una riga che si accende senza cambiare
+    // altezza, così l'elenco non si muove sotto il puntatore.
+    background: v.$bg;
+  }
+
+  &:active {
+    transform: scale(0.999);
+    transition: transform v.$dur-press;
+  }
+
+  &__icon {
+    width: 34px;
+    height: 34px;
+    border-radius: v.$r-pill;
+    background: v.$bg;
+    color: v.$muted;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    i {
+      font-size: 13px;
+    }
+
+    &--accent {
+      background: v.$accent-soft;
+      color: v.$accent;
+    }
+  }
+
+  &__main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  &__title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14.5px;
+    font-weight: 600;
+  }
+
+  &__sub {
+    display: flex;
+    gap: 6px;
+    font-size: 12px;
+    color: v.$muted;
+
+    // Il punto separatore lo mette il CSS: così l'ora senza tag non si porta
+    // dietro un "·" appeso al niente.
+    span + span::before {
+      content: "· ";
+    }
+  }
+
+  &__cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    color: v.$muted;
+  }
+
+  &__amount {
+    text-align: right;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  &__more {
+    justify-self: end;
+    font-size: 13px;
+    color: v.$muted-2;
+  }
+}

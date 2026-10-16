@@ -1,0 +1,133 @@
+@use "../../styles/variables" as v;
+
+// Tutto lo stepper sta sotto `:root .div-stepper`, il contenitore che
+// `stepper.tsx` disegna sempre. Non è vezzo: lara qualifica i suoi selettori
+// con tre classi (`.p-stepper .p-stepper-header .p-stepper-action`,
+// `.p-stepper.p-stepper-vertical .p-stepper-toggleable-content`) e contro
+// quelli un `.p-stepper-action` da solo perde. Perdeva davvero: i tre fondi
+// bianchi del tema chiaro — pannelli, contenuto apribile e bottone del passo —
+// restavano bianchi anche a tema scuro, ed era il riquadro bianco che si vedeva
+// nella creazione di un rimborso.
+:root .div-stepper {
+  // I passi vivono dentro un dialog: il fondo è quello della card, non uno suo.
+  .p-stepper-panels {
+    background: transparent;
+    color: v.$ink;
+    border-top: 1px solid v.$line;
+    padding: 1.5rem;
+  }
+
+  .p-stepper.p-stepper-vertical .p-stepper-toggleable-content {
+    background: transparent;
+    color: v.$ink;
+    flex: none;
+  }
+
+  .p-stepper-separator {
+    align-self: start;
+    background: v.$track;
+    opacity: 1;
+    margin-top: 1rem;
+    margin-left: 0;
+
+    &.completed {
+      background: v.$accent;
+    }
+  }
+
+  .p-stepper-title {
+    font-size: 0.875rem;
+    color: v.$ink;
+    font-family: v.$font-ui;
+  }
+
+  .p-stepper-action {
+    background: transparent;
+    gap: 0.5rem;
+    padding: 0;
+  }
+
+  .p-stepper-content {
+    padding-left: 0.7rem;
+  }
+
+  // Pallino del passo — stato di riposo.
+  .p-stepper-number {
+    height: 1.5rem;
+    min-width: 1.5rem;
+    font-size: 0.9rem;
+    line-height: 1.5rem;
+    background: v.$surface-2;
+    border: 1px solid v.$line;
+    color: v.$muted;
+  }
+
+  /* Header disabilitato (passi futuri) */
+  .p-stepper-header.p-disabled,
+  .p-stepper-header-bottom.p-disabled {
+    padding: 0;
+    margin-bottom: 1.5rem;
+    // Lo sbiadire lo decide il pallino, non l'intera riga: il titolo deve
+    // restare leggibile anche sul passo che non è ancora il suo turno.
+    opacity: 1;
+
+    .p-stepper-action,
+    .p-component {
+      opacity: 0.4;
+    }
+  }
+
+  .p-stepper-header.p-highlight {
+    padding: 0;
+  }
+
+  /* Header attivo */
+  .p-stepper-header.p-highlight.p-stepper-header-bottom {
+    padding: 0;
+    margin-bottom: 1.5rem;
+  }
+
+  .p-stepper-header.p-highlight .p-stepper-number {
+    background: v.$accent;
+    border-color: v.$accent;
+    color: v.$on-accent;
+  }
+
+  /* Titolo con sottotitolo (attr data) */
+  .custom-stepper-title {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: v.$ink;
+    font-size: 1.25rem;
+    margin-top: 1rem;
+    font-family: v.$font-ui;
+
+    &::after {
+      content: attr(data-sub-label);
+      display: block;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: v.$muted;
+      margin-top: 0.5rem;
+    }
+  }
+
+  /* Passo completato (icona di spunta al posto del numero) */
+  .p-stepper-number.completed {
+    color: transparent;
+    background: v.$positive;
+    border-color: v.$positive;
+    position: relative;
+
+    &.ph-bold.ph-check::before {
+      font-size: 0.875rem;
+      color: v.$on-accent;
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+    }
+  }
+}

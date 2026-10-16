@@ -1,0 +1,34 @@
+@use "../../../styles/variables.scss" as v;
+
+.investimento-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+
+  .form-row {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+
+    &.two-cols {
+      flex-direction: row;
+      gap: 1.5rem;
+
+      > * {
+        flex: 1;
+        min-width: 0;
+      }
+
+      @media screen and (max-width: v.$mobile) {
+        flex-direction: column;
+        gap: 1.25rem;
+      }
+    }
+  }
+
+  .field-hint {
+    color: v.$text-muted;
+    font-size: 0.78rem;
+  }
+}

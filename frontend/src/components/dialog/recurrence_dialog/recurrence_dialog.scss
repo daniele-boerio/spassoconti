@@ -1,0 +1,121 @@
+@use "../../../styles/variables.scss" as v;
+
+.recurrence-dialog {
+  .dialog-footer {
+    display: flex;
+
+    justify-content: flex-end;
+
+    gap: 0.75rem;
+
+    padding-top: 1rem;
+
+    .div-button {
+      flex: 1;
+
+      button {
+        width: 100%;
+
+        max-width: 100%;
+      }
+    }
+  }
+}
+
+.recurrence-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+
+  .type-selector {
+    align-self: center;
+    width: 100%;
+    display: flex;
+
+    .p-button {
+      flex: 1;
+      font-weight: 600;
+      min-width: 0;
+
+      .p-button-label {
+        display: block;
+        width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        padding: 0 0.5rem;
+      }
+    }
+  }
+
+  .form-row {
+    width: 100%;
+    display: flex;
+    flex-direction: row; // Layout desktop
+    gap: 1.5rem;
+
+    // --- MODIFICA RESPONSIVE ---
+    @media screen and (max-width: v.$mobile) {
+      flex-direction: column; // Layout smartphone: elementi impilati
+      gap: 1.25rem;
+    }
+
+    .field {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+
+      .field-label {
+        font-size: 0.85rem;
+        font-family: v.$font-main;
+        margin: 0 0 0.25rem 0;
+        color: v.$text-main;
+      }
+
+      .p-inputnumber,
+      .p-calendar,
+      .p-dropdown,
+      .p-inputtext,
+      .p-selectbutton {
+        flex: 1;
+        width: 100%; // Assicura che i componenti occupino tutta la larghezza
+      }
+    }
+  }
+
+  // Dropdown + input "nuova categoria/sottocategoria" affiancati,
+  // impilati su mobile. Senza input, resta solo il dropdown a tutta larghezza.
+  .field-inline {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 0.75rem;
+
+    > * {
+      flex: 1;
+      min-width: 0;
+    }
+
+    @media screen and (max-width: v.$mobile) {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.75rem;
+    }
+  }
+}
+
+// Semplice animazione per la sottocategoria che appare
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

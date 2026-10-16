@@ -1,0 +1,18 @@
+@use "../../styles/variables" as v;
+
+.section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 4px;
+
+  @include v.eyebrow;
+  color: v.$muted;
+
+  &__aside {
+    font-variant-numeric: tabular-nums;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+}

@@ -1,0 +1,84 @@
+@use "../../styles/variables" as v;
+
+.chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: v.$r-pill;
+
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+
+  // Il chip resta della misura del design; l'area sensibile al tocco arriva
+  // ai 44px richiesti con uno pseudo-elemento, senza gonfiare il layout.
+  &::after {
+    content: "";
+    position: absolute;
+    inset: -6px 0;
+  }
+
+  &--outline {
+    background: v.$surface;
+    border-color: v.$line;
+    color: v.$muted;
+  }
+
+  &--active {
+    background: var(--chip-active-bg);
+    color: var(--chip-active-ink);
+    font-weight: 700;
+  }
+
+  &--solid {
+    background: v.$surface-2;
+    color: v.$ink;
+  }
+
+  &--accent {
+    background: v.$accent;
+    color: v.$on-accent;
+    font-weight: 700;
+  }
+
+  &--dashed {
+    background: transparent;
+    border: 1px dashed v.$line;
+    color: v.$accent;
+    font-weight: 700;
+  }
+
+  i {
+    font-size: 12px;
+  }
+
+  &__meta {
+    font-weight: 700;
+    color: v.$muted;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &--active &__meta,
+  &--accent &__meta {
+    color: inherit;
+    opacity: 0.8;
+  }
+
+  // Azione non ancora disponibile: resta visibile perché dice cosa si potrà
+  // fare, ma non finge di essere toccabile.
+  &--disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  &:active {
+    transform: scale(0.97);
+    transition: transform v.$dur-press;
+  }
+}

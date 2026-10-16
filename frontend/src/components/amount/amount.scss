@@ -1,0 +1,22 @@
+@use "../../styles/variables" as v;
+
+.amount {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+
+  &--positive {
+    color: v.$positive;
+  }
+
+  &--negative {
+    color: v.$negative;
+  }
+
+  &__currency {
+    color: v.$muted-2;
+    font-weight: 500;
+  }
+}

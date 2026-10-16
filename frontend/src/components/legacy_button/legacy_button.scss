@@ -1,0 +1,228 @@
+@use "../../styles/variables.scss" as v;
+
+// Le varianti stanno dentro `:root` per lo stesso motivo spiegato in
+// styles/_primereact.scss: la base `.p-button` là è scritta `:root .p-button`
+// per stare sopra a lara, e senza lo stesso peso qui ogni bottone dell'app
+// diventava un bottone d'accento — "Annulla" indistinguibile da "Salva".
+:root {
+  // Stato interattivo di base condiviso da tutti i bottoni
+  .div-button .p-button {
+    font-weight: 600;
+    transition:
+      background-color v.$transition-fast,
+      border-color v.$transition-fast,
+      box-shadow v.$transition-fast,
+      transform v.$transition-fast,
+      filter v.$transition-fast;
+
+    &:active {
+      transform: translateY(1px);
+    }
+  }
+
+  .action-button {
+    .p-button {
+      color: v.$text-on-button;
+      border-color: v.$bc-button-primary;
+      background-color: v.$bg-button-primary;
+      box-shadow: v.$shadow-sm;
+
+      &:hover {
+        filter: brightness(1.07);
+        box-shadow: v.$shadow-md;
+        transform: translateY(-1px);
+      }
+    }
+  }
+
+  // "Annulla", "Indietro": riempimento neutro, quindi il testo è quello normale
+  // della pagina. `$text-on-button` è il colore che sta *sopra all'accento* — su
+  // un fondo `surface-2` non ci sta: al buio erano due blu quasi identici (testo
+  // #10203a su fondo #16294a) e al chiaro bianco su grigio chiaro. In entrambi i
+  // temi il tasto restava lì senza etichetta leggibile.
+  .reset-button {
+    .p-button {
+      color: v.$text-main;
+      border-color: v.$bc-button-secondary;
+      background-color: v.$bg-button-secondary;
+
+      &:hover {
+        filter: brightness(1.07);
+      }
+    }
+  }
+
+  .trasparent-button {
+    .p-button {
+      color: v.$text-main;
+      border-color: transparent;
+      background-color: transparent;
+    }
+  }
+
+  .split-button {
+    .p-button {
+      color: v.$text-on-button;
+      border-color: v.$accent-split;
+      background-color: v.$accent-split;
+      transition:
+        background-color 0.15s ease,
+        border-color 0.15s ease;
+
+      &:hover {
+        border-color: v.$accent-split-hover;
+        background-color: v.$accent-split-hover;
+      }
+    }
+  }
+
+  .trasparent-button-account {
+    .p-button {
+      background: transparent !important;
+      border: none !important;
+      color: v.$text-account !important;
+      filter: drop-shadow(0px 0px 3px rgba(0, 0, 0, 0.4));
+    }
+  }
+
+  .trasparent-button-clear {
+    .p-button {
+      color: v.$text-on-dark;
+      border-color: transparent;
+      background-color: transparent;
+    }
+  }
+
+  .trasparent-danger-button {
+    .p-button {
+      color: v.$text-red;
+      border-color: transparent;
+      background-color: transparent;
+      filter: drop-shadow(0px 0px 3px rgba(0, 0, 0, 0.4));
+    }
+  }
+
+  .div-button {
+    display: flex;
+    border-radius: v.$radius-md;
+
+    &.invisible {
+      display: none;
+    }
+
+    button {
+      &.compact {
+        width: fit-content;
+      }
+    }
+  }
+
+  .div-icon-label-button {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.313rem;
+
+    &.row {
+      flex-direction: row;
+    }
+
+    &.column {
+      flex-direction: column;
+    }
+
+    &.compact {
+      width: fit-content;
+    }
+
+    // stato base (non compatto)
+    &:not(.compact) {
+      width: 100%;
+    }
+  }
+
+  .icon-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+
+  .span-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+
+  .table-add-button {
+    .p-button {
+      width: 100%;
+      color: v.$text-main;
+      border: 1px dashed v.$text-main;
+      background-color: transparent;
+      .div-icon-label-button {
+        justify-content: flex-start !important; /* sposta il contenuto a sinistra */
+        text-align: left !important;
+      }
+    }
+  }
+
+  .add-transaction-button {
+    .p-button {
+      justify-content: center !important;
+      max-width: 4rem !important;
+      max-height: 4rem !important;
+      color: v.$text-on-dark;
+      border: none;
+      background-color: v.$btn-light;
+      .icon-button {
+        font-size: 1.5rem;
+      }
+    }
+  }
+
+  .add-category-button,
+  .add-account-button,
+  .add-tag-button,
+  .add-debt-button,
+  .add-investment-button,
+  .add-transaction-button {
+    border-radius: v.$radius-pill;
+
+    .p-button {
+      justify-content: center !important;
+      max-width: 4rem !important;
+      max-height: 4rem !important;
+      width: 4rem;
+      height: 4rem;
+      border-radius: v.$radius-pill;
+      color: v.$text-on-button;
+      border: none;
+      background-color: v.$bg-button-primary;
+      box-shadow: v.$shadow-md;
+      .icon-button {
+        font-size: 1.5rem;
+      }
+
+      &:hover {
+        filter: brightness(1.07);
+        transform: translateY(-2px);
+        box-shadow: v.$shadow-lg;
+      }
+    }
+  }
+
+  .add-subcategory-button {
+    .p-button {
+      width: 100%;
+      color: v.$text-main;
+      border: none;
+      background-color: transparent;
+      .div-icon-label-button {
+        justify-content: flex-start !important; /* sposta il contenuto a sinistra */
+        text-align: left !important;
+      }
+    }
+  }
+}

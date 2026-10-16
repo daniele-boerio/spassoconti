@@ -1,0 +1,77 @@
+@use "../../styles/variables" as v;
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  border: 1px solid transparent;
+  border-radius: v.$r-field;
+  cursor: pointer;
+
+  font-family: inherit;
+  font-weight: 700;
+
+  &--lg {
+    min-height: 54px;
+    padding: 0 20px;
+    font-size: 15px;
+  }
+
+  &--md {
+    min-height: 50px;
+    padding: 0 18px;
+    border-radius: 15px;
+    font-size: 15px;
+  }
+
+  &--sm {
+    min-height: v.$tap-target;
+    padding: 12px 18px;
+    border-radius: 14px;
+    font-size: 14px;
+  }
+
+  &--block {
+    width: 100%;
+  }
+
+  &--primary {
+    background: v.$accent;
+    color: v.$on-accent;
+  }
+
+  &--secondary {
+    background: v.$surface;
+    border-color: v.$line;
+    color: v.$ink;
+  }
+
+  &--neutral {
+    background: v.$surface-2;
+    color: v.$ink;
+  }
+
+  &--danger {
+    background: v.$negative;
+    color: var(--knob);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  // Col mouse il bottone risponde già al passaggio, non solo al clic.
+  @media (hover: hover) {
+    &:not(:disabled):hover {
+      filter: brightness(0.95);
+    }
+  }
+
+  &:not(:disabled):active {
+    transform: scale(0.97);
+    transition: transform v.$dur-press;
+  }
+}

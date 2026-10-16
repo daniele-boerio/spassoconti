@@ -1,0 +1,228 @@
+@use "../../../styles/variables" as v;
+
+// ── Card del risparmio del mese ─────────────────────────────────────────────
+.savings-card {
+  gap: 18px;
+  padding: 22px;
+
+  &__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  &__headline {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  &__eyebrow {
+    @include v.eyebrow;
+    color: v.$muted;
+  }
+
+  &__value {
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -0.035em;
+  }
+
+  &__delta {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px;
+    border-radius: v.$r-pill;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+
+    i {
+      font-size: 10px;
+    }
+
+    &--up {
+      background: v.$accent-soft;
+      color: v.$accent;
+    }
+
+    &--down {
+      background: v.$negative-soft;
+      color: v.$negative;
+    }
+  }
+
+  // Barra impilata: le tre quote sono frazioni delle entrate, e quello che
+  // avanza resta il fondo della traccia.
+  &__bar {
+    display: flex;
+    height: 12px;
+    border-radius: v.$r-pill;
+    background: v.$surface-2;
+    overflow: hidden;
+  }
+
+  &__segment {
+    height: 100%;
+
+    &--spent {
+      background: v.$accent;
+    }
+
+    &--aside {
+      background: v.$accent-2;
+    }
+
+    &--left {
+      background: v.$surface-2;
+    }
+  }
+
+  &__legend {
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+  }
+
+  &__legend-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 13.5px;
+
+    .amount {
+      font-weight: 700;
+    }
+  }
+
+  &__legend-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+
+    &--spent {
+      background: v.$accent;
+    }
+
+    &--aside {
+      background: v.$accent-2;
+    }
+
+    &--left {
+      background: v.$surface-2;
+    }
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding-top: 14px;
+    border-top: 1px solid v.$line-soft;
+    font-size: 12.5px;
+    color: v.$muted;
+
+    strong .amount {
+      color: v.$ink;
+      font-weight: 700;
+    }
+  }
+}
+
+// ── Da notare ───────────────────────────────────────────────────────────────
+.insight {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+
+  &__icon {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: v.$r-icon;
+
+    i {
+      font-size: 13px;
+    }
+
+    &--negative {
+      background: v.$negative-soft;
+      color: v.$negative;
+    }
+
+    &--positive {
+      background: v.$accent-soft;
+      color: v.$accent;
+    }
+  }
+
+  &__text {
+    flex: 1;
+    font-size: 13.5px;
+    line-height: 1.45;
+  }
+}
+
+// ── Budget per categoria ────────────────────────────────────────────────────
+// Il tetto è il track, la spesa il segmento: il colore dice se ci si sta
+// dentro. Oltre il tetto la barra è piena e diventa negativa — di quanto si è
+// sforato lo dice la riga, perché una barra al 155% non si disegna.
+.budget-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  &__row {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  &__line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 13.5px;
+  }
+
+  &__name {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__figure {
+    flex: 0 0 auto;
+    color: v.$muted;
+
+    strong .amount {
+      color: v.$ink;
+      font-weight: 700;
+    }
+  }
+
+  &__caption {
+    font-size: 12px;
+    color: v.$muted;
+
+    &--over {
+      color: v.$negative;
+      font-weight: 600;
+    }
+  }
+}

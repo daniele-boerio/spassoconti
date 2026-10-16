@@ -1,0 +1,295 @@
+@use "../../styles/variables" as v;
+
+.home-page {
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  &__salute {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__greeting {
+    font-size: 13px;
+    color: v.$muted;
+  }
+
+  &__month {
+    font-family: v.$font-serif;
+    font-size: v.$fs-page-title;
+    font-weight: 400;
+    letter-spacing: -0.015em;
+    line-height: 1.05;
+    text-transform: capitalize;
+  }
+
+  // Le iniziali sono chi sei, e sono la porta del profilo.
+  &__avatar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+
+    border-radius: v.$r-icon;
+    background: v.$accent-soft;
+    color: v.$accent;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+
+    border: 0;
+    font-family: inherit;
+    cursor: pointer;
+
+    &:active {
+      transform: scale(0.97);
+      transition: transform v.$dur-press;
+    }
+  }
+
+  &__link {
+    color: v.$accent;
+    font-size: 12.5px;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  &__muted {
+    margin: 0;
+    font-size: 13.5px;
+    color: v.$muted;
+  }
+}
+
+// ── Card hero: il risparmio del mese ─────────────────────────────────────
+.hero {
+  &__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  &__eyebrow {
+    @include v.eyebrow;
+    color: v.$muted;
+  }
+
+  &__delta {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px;
+    border-radius: v.$r-pill;
+    font-size: 11.5px;
+    font-weight: 700;
+    white-space: nowrap;
+
+    i {
+      font-size: 10px;
+    }
+
+    // Mettere da parte più del mese scorso è la notizia buona: il colore segue
+    // il significato, non il segno.
+    &--good {
+      background: v.$accent-soft;
+      color: v.$accent;
+    }
+
+    &--bad {
+      background: v.$negative-soft;
+      color: v.$negative;
+    }
+  }
+
+  &__number {
+    font-family: v.$font-display;
+    font-size: v.$fs-hero;
+    font-weight: v.$fw-display;
+    letter-spacing: v.$tracking-hero;
+    line-height: v.$lh-hero;
+
+    .amount__currency {
+      font-size: 20px;
+      font-weight: 500;
+    }
+  }
+
+  &__budget {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  &__caption {
+    margin: 0;
+    font-size: 12.5px;
+    color: v.$muted;
+
+    strong {
+      color: v.$ink;
+      font-weight: 700;
+    }
+  }
+}
+
+// ── Tetto di spesa, in testa alle categorie ──────────────────────────
+.spending-cap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  &__legend {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 12.5px;
+    color: v.$muted;
+
+    strong {
+      color: v.$ink;
+      font-weight: 700;
+    }
+  }
+
+  &__over {
+    color: v.$negative;
+
+    .amount__currency {
+      color: inherit;
+    }
+  }
+
+  &__set {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: v.$tap-target;
+    padding: 0 16px;
+
+    border-radius: v.$r-field;
+    background: v.$accent-soft;
+    color: v.$accent;
+    font-size: 13.5px;
+    font-weight: 700;
+    text-decoration: none;
+
+    i {
+      font-size: 12px;
+    }
+  }
+}
+
+// ── Dove vanno i soldi ─────────────────────────────────────────────────────
+.category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  &__icon {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+
+    border-radius: v.$r-icon;
+    background: v.$accent-soft;
+    color: v.$accent;
+
+    i {
+      font-size: 14px;
+    }
+
+    // La categoria fuori media si segnala già dall'icona.
+    &--over {
+      background: v.$negative-soft;
+      color: v.$negative;
+    }
+  }
+
+  &__body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  &__line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 13.5px;
+    font-weight: 600;
+  }
+
+  &__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__over {
+    color: v.$negative;
+    font-weight: 700;
+  }
+
+  // Le quattro righe prendono la serie grafici nell'ordine; la quinta tinta
+  // (negativa) resta al segmento "sopra media", che se la assegna da sé.
+  &__bar {
+    &--1 .progress__segment--accent {
+      background: v.$series-1;
+    }
+    &--2 .progress__segment--accent {
+      background: v.$series-2;
+    }
+    &--3 .progress__segment--accent {
+      background: v.$series-3;
+    }
+    &--4 .progress__segment--accent {
+      background: v.$series-4;
+    }
+  }
+}
+
+// ── Desktop ─────────────────────────────────────────────────────────────────
+// Il numero protagonista cresce con lo spazio che c'è, e il saluto diventa la
+// riga della top bar. Nient'altro cambia: stessi colori, stesse card.
+@media (min-width: v.$bp-desktop) {
+  .home-page {
+    &__month {
+      font-size: 40px;
+    }
+
+    // Su desktop il profilo si apre dal rail, in fondo: un secondo bersaglio
+    // in cima direbbe la stessa cosa due volte.
+    &__avatar {
+      display: none;
+    }
+  }
+
+  .hero {
+    &__number {
+      font-size: v.$fs-hero-desktop;
+    }
+  }
+}

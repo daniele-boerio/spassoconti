@@ -1,0 +1,78 @@
+@use "../../../styles/variables" as v;
+
+.filters-sheet {
+  &__reset {
+    padding: 0 6px;
+    border: 0;
+    background: transparent;
+    color: v.$accent;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  &__section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  &__label {
+    @include v.eyebrow;
+    color: v.$muted;
+  }
+
+  &__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  &__dates {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  &__switch {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 15px 16px;
+
+    border-radius: v.$r-field;
+    background: v.$bg;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+}
+
+// ── Pannello (desktop) ──────────────────────────────────────────────────────
+// Stesso contenuto del foglio, ma sempre aperto nella colonna di destra: qui i
+// filtri non coprono la lista, le stanno accanto, e non serve un bottone per
+// confermare — la lista si aggiorna sotto le mani.
+.filters-panel {
+  gap: 22px;
+  align-self: start;
+  // Il pannello segue la lista mentre scorre invece di uscire dallo schermo.
+  position: sticky;
+  top: 20px;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  &__title {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+}

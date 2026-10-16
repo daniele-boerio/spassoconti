@@ -1,0 +1,88 @@
+@use "../../styles/variables" as v;
+
+.range {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  &__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  &__label {
+    @include v.eyebrow;
+    color: v.$muted;
+  }
+
+  &__caption {
+    font-size: 13px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__control {
+    position: relative;
+    height: 22px;
+    display: flex;
+    align-items: center;
+  }
+
+  &__track,
+  &__fill {
+    position: absolute;
+    height: 6px;
+    border-radius: v.$r-pill;
+  }
+
+  &__track {
+    left: 0;
+    right: 0;
+    background: v.$surface-2;
+  }
+
+  &__fill {
+    background: v.$accent;
+  }
+
+  // I due input coprono la stessa traccia: solo le maniglie ricevono il tocco,
+  // altrimenti quello sopra intercetterebbe ogni gesto dell'altro.
+  &__input {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 22px;
+    margin: 0;
+    appearance: none;
+    background: transparent;
+    pointer-events: none;
+
+    &::-webkit-slider-thumb {
+      appearance: none;
+      pointer-events: auto;
+      width: 22px;
+      height: 22px;
+      border-radius: v.$r-pill;
+      background: v.$surface;
+      border: 2px solid v.$accent;
+      cursor: pointer;
+    }
+
+    &::-moz-range-thumb {
+      pointer-events: auto;
+      width: 18px;
+      height: 18px;
+      border-radius: v.$r-pill;
+      background: v.$surface;
+      border: 2px solid v.$accent;
+      cursor: pointer;
+    }
+
+    &:focus-visible::-webkit-slider-thumb {
+      outline: 2px solid v.$accent;
+      outline-offset: 2px;
+    }
+  }
+}

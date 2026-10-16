@@ -1,0 +1,189 @@
+@use "../../styles/variables" as v;
+
+// Vista "Grafici" dell'Analisi. Card, titoli e spaziature vengono da
+// `Card`/`CardTitle`; colonne e linee dai componenti in components/charts.
+// Qui restano la legenda, il badge della tendenza e la ciambella.
+
+// ── Legenda ───────────────────────────────────────────────────────────────
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+
+  font-size: 12px;
+  color: v.$muted;
+
+  &__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  &__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+
+    &--in {
+      background: v.$positive;
+    }
+
+    &--out {
+      background: v.$negative;
+    }
+
+    &--aside {
+      background: v.$accent-2;
+    }
+
+    &--line {
+      background: v.$accent;
+    }
+
+    // Il tratteggio della tendenza, ridotto a pastiglia.
+    &--guide {
+      width: 12px;
+      height: 2px;
+      border-radius: v.$r-pill;
+      background: v.$muted-2;
+    }
+  }
+}
+
+.chart-badge {
+  font-size: 11.5px;
+  font-weight: 700;
+
+  &--up {
+    color: v.$positive;
+  }
+
+  &--down {
+    color: v.$negative;
+  }
+}
+
+// Il posto della linea quando la linea non c'è: nessuna categoria scelta, o
+// nessun movimento nel periodo.
+.chart-hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: v.$muted;
+}
+
+// ── Composizione: ciambella e legenda ─────────────────────────────────────
+.donut {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+
+  &__chart {
+    flex: 0 0 auto;
+    width: 132px;
+    height: 132px;
+  }
+
+  &__arc {
+    fill: none;
+    // La fetta si disegna dal punto in cima, in senso orario.
+    stroke-linecap: butt;
+
+    &--1 {
+      stroke: v.$series-1;
+    }
+    &--2 {
+      stroke: v.$series-2;
+    }
+    &--3 {
+      stroke: v.$series-3;
+    }
+    &--4 {
+      stroke: v.$series-4;
+    }
+    &--5 {
+      stroke: v.$series-5;
+    }
+    // Tutto quello che sta sotto le prime cinque: una tinta che non compete.
+    &--rest {
+      stroke: v.$surface-2;
+    }
+  }
+
+  &__legend {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 12.5px;
+  }
+
+  &__dot {
+    flex: 0 0 auto;
+    align-self: center;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+
+    &--1 {
+      background: v.$series-1;
+    }
+    &--2 {
+      background: v.$series-2;
+    }
+    &--3 {
+      background: v.$series-3;
+    }
+    &--4 {
+      background: v.$series-4;
+    }
+    &--5 {
+      background: v.$series-5;
+    }
+    &--rest {
+      background: v.$surface-2;
+    }
+  }
+
+  &__name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__share {
+    flex: 0 0 auto;
+    color: v.$muted;
+  }
+
+  &__value {
+    flex: 0 0 auto;
+    font-weight: 700;
+  }
+}
+
+// Sotto una certa larghezza la ciambella e la sua legenda non stanno in fila.
+@media (max-width: 380px) {
+  .donut {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+
+    &__chart {
+      align-self: center;
+    }
+  }
+}

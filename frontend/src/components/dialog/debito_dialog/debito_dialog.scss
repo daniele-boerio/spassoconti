@@ -1,0 +1,16 @@
+.debito-dialog .debito-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.debito-dialog .form-row {
+  display: flex;
+  flex-direction: column;
+}
+
+.buttons-footer-dialog {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}

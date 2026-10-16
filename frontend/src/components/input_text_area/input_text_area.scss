@@ -1,0 +1,70 @@
+@use "../../styles/variables" as v;
+
+/* Contenitore principale */
+.div-inputtextarea {
+  // Sostituito tertiary con il tuo border-color standard
+  border-bottom: 1px solid v.$border-color;
+  transition: border-color 0.2s ease;
+  width: 100%;
+
+  // Effetto linea colorata al focus
+  &:focus-within {
+    border-bottom-color: v.$bg-button-primary;
+  }
+}
+
+/* Wrapper interno textarea + icone */
+.div-div-inputtextarea {
+  display: flex;
+  align-items: flex-start; // Allineato in alto per le icone nelle textarea lunghe
+  padding: 0.25rem 0;
+}
+
+/* Icone */
+.icon-inputtextarea {
+  margin-right: 0.5rem;
+  margin-left: 0.5rem;
+  margin-top: 0.5rem; // Leggero offset per allinearla alla prima riga di testo
+  color: v.$text-muted;
+}
+
+/* Input primereact */
+.p-inputtextarea {
+  width: 100%;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  font-size: 1rem;
+  color: v.$text-main;
+  font-family: v.$font-main;
+  padding: 0.5rem 0;
+  resize: vertical; // Permette all'utente di ridimensionare solo in altezza
+  min-height: 2.5rem;
+
+  &::placeholder {
+    color: v.$text-muted;
+  }
+
+  &:focus {
+    box-shadow: none !important;
+  }
+
+  // Personalizzazione scrollbar interna
+  &::-webkit-scrollbar {
+    width: 0.25rem;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: v.$border-color;
+    border-radius: 10px;
+  }
+}
+
+/* Label normale sopra textarea */
+.label-inputtextarea {
+  display: block;
+  margin: 0 0 0.25rem 0;
+  color: v.$text-main;
+  font-family: v.$font-main;
+  font-size: 0.85rem;
+  font-weight: 600;
+}

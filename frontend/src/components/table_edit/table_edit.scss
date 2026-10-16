@@ -1,0 +1,101 @@
+@use "../../styles/variables" as v;
+
+.div-table-edit {
+  width: 100%;
+  min-width: 100%;
+  overflow-x: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+
+  &.invisible {
+    display: none;
+  }
+
+  .table-add-button {
+    margin-bottom: 1rem;
+    display: block;
+    width: max-content;
+  }
+
+  .p-datatable {
+    width: max-content;
+    min-width: 100%;
+    background-color: transparent;
+    font-family: v.$font-main;
+
+    // Rimuoviamo i bordi esterni predefiniti di Prime
+    .p-datatable-wrapper {
+      border-radius: 12px;
+    }
+  }
+}
+
+/* Header della Tabella */
+.p-datatable-thead {
+  tr {
+    // Gradiente dinamico: da sfondo card a grigio tenue/scuro
+    background: linear-gradient(
+      to right,
+      v.$bg-card,
+      v.$bg-gradient-table
+    ) !important;
+    border-top: 1px solid v.$border-color;
+    border-bottom: 1px solid v.$border-color;
+  }
+
+  th {
+    border: none;
+    background: transparent !important;
+    color: v.$text-main;
+    font-weight: 700;
+    padding: 1rem;
+    text-align: left;
+    font-size: 0.9rem;
+  }
+}
+
+/* Corpo della Tabella */
+.p-datatable-tbody {
+  tr {
+    background: transparent !important;
+    border-bottom: 1px solid v.$border-color;
+    color: v.$text-main;
+    transition: background-color 0.2s;
+
+    &:hover {
+      background-color: color-mix(in srgb, v.$bg-button-primary 3%, transparent) !important;
+    }
+  }
+
+  td {
+    background: transparent !important;
+    padding: 1rem;
+    border: none;
+  }
+}
+
+/* Input di ricerca/filtro dentro i dropdown della tabella */
+.p-dropdown-filter-container {
+  padding: 0.5rem;
+  background-color: v.$bg-card;
+
+  .p-inputtext {
+    border: 1px solid v.$border-color !important;
+    background-color: v.$bg-app !important;
+    color: v.$text-main;
+    border-radius: 10px;
+    padding: 0.4rem;
+
+    &:focus {
+      border-color: v.$bg-button-primary !important;
+      box-shadow: none;
+    }
+  }
+}
+
+/* Icone di ordinamento */
+.p-sortable-column-icon {
+  color: v.$text-muted;
+  font-size: 0.8rem;
+}

@@ -1,0 +1,104 @@
+@use "../../styles/variables" as v;
+
+/* Il trigger.
+
+   Il bottone contiene la sola icona, e finché è un `inline-block` la sua
+   base poggia sulla riga di testo del contenitore: sotto resta lo spazio
+   della discesa del carattere, che rende il wrapper qualche pixel più alto
+   del bottone. Chi centra la riga centra quel wrapper, non il bottone, e
+   i tre puntini si vedono spostati verso l'alto. Flex sui due livelli
+   toglie la riga di testo di mezzo: il bottone è il wrapper, e l'icona sta
+   al centro del bottone in entrambe le direzioni. */
+.three-dots {
+  display: flex;
+  align-items: center;
+
+  .p-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Niente alone al tocco.
+
+     `styles/_primereact.scss` accende `--accent-soft` dietro ai bottoni di
+     testo al passaggio del mouse. Su un telefono il mouse non c'è: il
+     `:hover` che un tocco lascia acceso ci resta finché non se ne prende un
+     altro da qualche parte, e quel quadrato colorato (ambra nel tema scuro)
+     dietro ai tre puntini sembra un menù rimasto aperto.
+
+     Il `:root` davanti è lo stesso accorgimento di `styles/_primereact.scss`,
+     e per lo stesso motivo: quella regola è già prefissata così, quindi senza
+     vinceremmo solo perché il nostro foglio arriva dopo — e l'ordine di
+     caricamento di un chunk pigro non è una cosa su cui appoggiarsi. */
+  :root & .p-button.p-button-text {
+    &:enabled:hover,
+    &:enabled:active,
+    &:focus {
+      background: transparent;
+      border-color: transparent;
+      box-shadow: none;
+      // Stessa tinta di riposo — è quella che entrambe le pagine danno al
+      // trigger — così l'icona non si accende sotto il dito.
+      color: v.$muted-2;
+    }
+
+    // Da tastiera un segno serve, ma `:focus-visible` non scatta su un tocco:
+    // l'alone di prima non torna.
+    &:focus-visible {
+      outline: 2px solid v.$accent;
+      outline-offset: -4px;
+      border-radius: v.$r-field;
+    }
+  }
+}
+
+/* Voce di menu "Danger" (es. Elimina) */
+.p-menu .menu-item-danger {
+  div a span {
+    color: v.$text-red !important; // Sostituito red fisso
+  }
+
+  &:hover {
+    background-color: color-mix(in srgb, v.$text-red 10%, transparent) !important;
+  }
+}
+
+/* OverlayPanel (Il contenitore fluttuante) */
+.p-overlaypanel {
+  border: 1px solid v.$border-color; // Aggiunto un leggero bordo per stacco visivo
+  background-color: v.$bg-card;
+  box-shadow: v.$shadow-color;
+  width: 8.375rem;
+  border-radius: 12px;
+
+  /* Rimuove la "frecce" (triangolini) sopra/sotto l'overlay */
+  &:before,
+  &:after {
+    display: none !important;
+    content: none !important;
+    border: 0 !important;
+  }
+}
+
+/* Menu (PrimeReact Component) */
+.p-menu.p-component.p-ripple-disabled {
+  background-color: v.$bg-card; // Usiamo lo sfondo card per i menu
+  border: none;
+  padding: 0.5rem 0;
+
+  .p-menuitem {
+    .p-menuitem-link {
+      color: v.$text-main;
+      transition: background-color 0.2s;
+
+      .p-menuitem-icon {
+        color: v.$text-muted;
+      }
+
+      &:hover {
+        background-color: v.$bg-app; // Effetto hover discreto
+      }
+    }
+  }
+}

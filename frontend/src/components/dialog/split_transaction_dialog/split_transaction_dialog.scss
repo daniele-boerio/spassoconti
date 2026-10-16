@@ -1,0 +1,130 @@
+@use "../../../styles/variables.scss" as v;
+
+.split-dialog {
+  .split-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .split-subtitle {
+    margin: 0;
+    color: v.$text-muted;
+    font-size: 0.9rem;
+  }
+
+  // --- Riepilogo importi ---
+  // Resta agganciato in cima all'area scrollabile del dialog mentre si
+  // scorrono le parti, così originale/assegnato/rimanente sono sempre visibili.
+  .split-summary {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid v.$border-color;
+    border-radius: 12px;
+    background: v.$bg-gradient-table;
+
+    &__item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      flex: 1;
+      min-width: 7rem;
+
+      .label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        color: v.$text-muted;
+      }
+
+      .value {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: v.$text-main;
+
+        &.is-ok {
+          color: v.$green;
+        }
+
+        &.is-warning {
+          color: v.$red;
+        }
+      }
+    }
+  }
+
+  // --- Lista parti ---
+  .split-parts {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+
+  .split-part {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem;
+    border: 1px solid v.$border-color;
+    border-left: 3px solid v.$accent-split;
+    border-radius: 12px;
+    background: v.$bg-card;
+
+    &__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    &__title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: v.$accent-split;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 1rem;
+
+      .field {
+        flex: 1;
+        min-width: 0;
+      }
+    }
+  }
+
+  .split-add-button {
+    .p-button {
+      border-color: v.$accent-split;
+      color: v.$accent-split;
+    }
+  }
+
+  .split-error {
+    padding: 0.6rem 0.85rem;
+    border-radius: 8px;
+    background: v.$negative-soft;
+    color: v.$red;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .buttons-footer-dialog {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding-top: 0.5rem;
+  }
+
+  @media (max-width: v.$tablet) {
+    .split-part .form-row {
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+  }
+}

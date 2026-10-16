@@ -1,0 +1,9 @@
+<!-- Icona di SpassoConto: il portafoglio con la carta che sbuca, piatto, due
+     toni sull'accento del tema Menta. Le PNG in questa cartella hanno la stessa
+     geometria: se cambi una misura qui, rigenerale. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="112" fill="#0e7c5a" />
+  <rect x="172" y="118" width="196" height="118" rx="26" fill="#9ed9c1" transform="rotate(-13 256 214)" />
+  <rect x="104" y="198" width="304" height="198" rx="48" fill="#eaf3ef" />
+  <circle cx="348" cy="297" r="26" fill="#0e7c5a" />
+</svg>

@@ -1,0 +1,169 @@
+@use "../../styles/variables" as v;
+
+.div-table-visualization {
+  &.invisible {
+    display: none;
+  }
+
+  .table-row-disabled {
+    opacity: 0.5;
+    pointer-events: none;
+    cursor: not-allowed;
+  }
+}
+
+/* Header Tabella */
+.p-datatable-thead tr {
+  // Usiamo il gradiente dinamico definito nel passaggio precedente
+  background: v.$table-header !important;
+  border: 1px solid v.$border-color !important;
+}
+
+.p-datatable-thead th {
+  border-bottom: none;
+  background: transparent !important;
+  font-family: v.$font-main;
+  color: v.$text-table-header !important;
+}
+
+/* Corpo Tabella */
+.p-datatable-tbody {
+  tr {
+    background: transparent !important;
+    color: v.$text-main;
+
+    // Stato selezionato (Highlight)
+    &.p-highlight,
+    &[aria-selected="true"] {
+      color: v.$text-green !important; // O v.$color-primary se preferisci il blu
+      background-color: color-mix(in srgb, v.$bg-button-primary 5%, transparent) !important;
+
+      td {
+        border-top: 1px solid v.$bg-button-primary !important;
+        border-bottom: 1px solid v.$bg-button-primary !important;
+
+        &:first-child {
+          border-left: 1px solid v.$bg-button-primary !important;
+          border-top-left-radius: 6px !important;
+          border-bottom-left-radius: 6px !important;
+        }
+
+        &:last-child {
+          border-right: 1px solid v.$bg-button-primary !important;
+          border-top-right-radius: 6px !important;
+          border-bottom-right-radius: 6px !important;
+        }
+      }
+    }
+  }
+
+  td {
+    border-bottom: none;
+    border-top: 0.3px solid v.$border-color;
+    background: v.$bg-gradient-table !important; //v.$bg-gradient-table !important;
+    padding: 1rem;
+  }
+}
+
+.p-datatable-wrapper {
+  border: 1px solid v.$border-table;
+}
+
+/* Paginator */
+.p-paginator-bottom.p-paginator.p-component {
+  border: none !important;
+  background-color: v.$bg-app !important; // Sfondo on-background
+  padding: 1rem;
+
+  .p-paginator-element {
+    color: v.$text-muted;
+    border-radius: 10px;
+    transition: background-color 0.2s;
+
+    &:enabled:hover {
+      background-color: v.$bg-table-paginator-selected;
+      color: v.$text-main;
+    }
+
+    &.p-highlight {
+      background-color: v.$bg-card !important;
+      border: 1px solid v.$bg-button-primary !important;
+      color: v.$bg-button-primary !important;
+    }
+  }
+}
+
+.transaction-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: v.$bg-card;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+
+  th,
+  td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  }
+
+  th {
+    background: rgba(255, 0, 0, 0.02);
+    color: v.$text-muted;
+    font-weight: 600;
+  }
+
+  tr.uscita .amount {
+    color: v.$red;
+    font-weight: bold;
+  }
+  tr.entrata .amount {
+    color: v.$green;
+    font-weight: bold;
+  }
+  tr.rimborso .amount {
+    color: #3498db;
+    font-weight: bold;
+  }
+
+  .badge {
+    font-size: 0.7rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 0.625rem;
+    background: #eee;
+    text-transform: uppercase;
+  }
+}
+
+.pagination-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1.5rem;
+  margin-top: 2rem;
+
+  .btn-pagination {
+    padding: 0.5rem 1rem;
+    border: 1px solid v.$text-muted;
+    background: white;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    &:not(:disabled):hover {
+      background: v.$text-main;
+      color: white;
+    }
+  }
+
+  .page-info {
+    color: v.$text-main;
+    font-size: 0.9rem;
+  }
+}

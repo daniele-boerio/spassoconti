@@ -1,0 +1,240 @@
+@use "../../styles/variables" as v;
+
+.taxonomy {
+  &__header {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  &__top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  &__back {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: v.$tap-target;
+    height: v.$tap-target;
+    margin-left: -10px;
+
+    border: 0;
+    background: transparent;
+    color: v.$ink;
+    cursor: pointer;
+
+    i {
+      font-size: 16px;
+    }
+  }
+
+  &__top .page-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__muted {
+    margin: 0;
+    font-size: 13.5px;
+    color: v.$muted;
+  }
+
+  &__pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  // Transazioni rimaste senza categoria: sta in cima perché è l'unica riga su
+  // cui c'è qualcosa da fare.
+  &__orphans {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  &__orphans-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  &__orphans-title {
+    font-size: 14.5px;
+    font-weight: 600;
+  }
+
+  &__orphans-hint {
+    font-size: 12px;
+    color: v.$muted;
+  }
+
+  &__add {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 15px;
+
+    border: 1px dashed v.$line;
+    border-radius: 18px;
+    background: transparent;
+    color: v.$accent;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+
+    i {
+      font-size: 13px;
+    }
+  }
+}
+
+.category-group {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.category-card {
+  display: flex;
+  flex-direction: column;
+
+  & + & {
+    border-top: 1px solid v.$line-soft;
+  }
+
+  &__head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 16px 20px;
+
+    border: 0;
+    border-radius: v.$r-card;
+    background: transparent;
+    color: inherit;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  &__icon {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+
+    border-radius: v.$r-icon;
+    background: v.$accent-soft;
+    color: v.$accent;
+
+    i {
+      font-size: 14px;
+    }
+  }
+
+  &__text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__name {
+    font-size: 15px;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__meta {
+    font-size: 12px;
+    color: v.$muted;
+
+    .amount {
+      font-size: inherit;
+      color: inherit;
+    }
+  }
+
+  &__chevron {
+    flex: 0 0 auto;
+    font-size: 12px;
+    color: v.$muted-2;
+  }
+
+  // I figli sono rientrati sotto l'icona della madre: si vede a colpo d'occhio
+  // a chi appartengono.
+  &__children {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 0 20px 18px 66px;
+  }
+}
+
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid v.$line;
+  border-radius: v.$r-pill;
+  background: v.$surface;
+
+  &__name {
+    padding: 8px 6px 8px 14px;
+    border: 0;
+    background: transparent;
+    color: v.$ink;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  &__remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 34px;
+    padding: 0 10px 0 4px;
+
+    border: 0;
+    background: transparent;
+    color: v.$muted-2;
+    cursor: pointer;
+
+    i {
+      font-size: 11px;
+    }
+  }
+}
+
+// Variante distruttiva del chip tratteggiato: vive solo qui.
+.chip--danger {
+  color: v.$negative;
+  border-color: v.$negative-line;
+}
+
+// Quante transazioni usano il tag: un conteggio, non un importo.
+.tag-pill__count {
+  margin-left: 6px;
+  color: v.$muted;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}

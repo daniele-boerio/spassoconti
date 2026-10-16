@@ -1,0 +1,35 @@
+@use "../../styles/variables" as v;
+
+.progress {
+  display: flex;
+  overflow: hidden;
+  border-radius: v.$r-pill;
+  background: v.$track;
+
+  &--h6 {
+    height: 6px;
+  }
+  &--h8 {
+    height: 8px;
+  }
+  &--h10 {
+    height: 10px;
+  }
+  &--h12 {
+    height: 12px;
+  }
+
+  &__segment {
+    height: 100%;
+
+    &--accent {
+      background: v.$accent;
+    }
+    &--positive {
+      background: v.$positive;
+    }
+    &--negative {
+      background: v.$negative;
+    }
+  }
+}

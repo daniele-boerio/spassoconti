@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+
+    <title>SpassoConto</title>
+    <meta
+      name="description"
+      content="Spese, conti, budget e ricorrenze in un posto solo: SpassoConto tiene i conti di casa senza fogli di calcolo."
+    />
+    <!-- Anteprima quando il link si condivide in chat. L'immagine va per URL
+         assoluto: le app di messaggistica non risolvono quelli relativi. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="SpassoConto" />
+    <meta
+      property="og:description"
+      content="Spese, conti, budget e ricorrenze in un posto solo."
+    />
+    <meta property="og:image" content="https://conti.spassocasa.it/icon-512.png" />
+    <meta name="apple-mobile-web-app-title" content="SpassoConto" />
+
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" type="image/png" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+
+    <!-- Riallineato al primo paint dallo script qui sotto e, a runtime, da
+         features/ui/theme.ts. -->
+    <meta name="theme-color" content="#f6f8f7" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Caricato SENZA bloccare il primo paint: un <link rel="stylesheet"> è
+         render-blocking, e se fonts.googleapis.com è lento o irraggiungibile
+         (rete che si sta riattaccando dopo il rilancio dell'app in home)
+         l'utente resta davanti a una pagina vuota finché non scade il timeout
+         della richiesta. Con `rel=preload` la pagina si disegna subito con la
+         fallback di sistema di --font-ui e Plus Jakarta subentra quando arriva. -->
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+      onload="this.rel='stylesheet'"
+    />
+    <noscript>
+      <link
+        href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet"
+      />
+    </noscript>
+
+    <script>
+      // Prima del primo paint, così cambiare tema non produce un flash.
+      // Duplica di proposito la logica di features/ui/theme.ts: non può
+      // aspettare il bundle.
+      (function () {
+        try {
+          var stored = localStorage.getItem("theme");
+          var theme =
+            stored === "light" || stored === "dark"
+              ? stored
+              : window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light";
+
+          document.documentElement.dataset.theme = theme;
+          document.documentElement.style.colorScheme = theme;
+          document
+            .querySelector('meta[name="theme-color"]')
+            .setAttribute("content", theme === "dark" ? "#0a1526" : "#f6f8f7");
+        } catch (e) {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
+
+    <!-- Stili della schermata d'avvio. Stanno qui e non in un .scss di
+         proposito: servono proprio nel caso in cui il bundle (JS o CSS) non
+         arrivi, quindi non possono dipenderne. -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #f6f8f7;
+      }
+      html[data-theme="dark"],
+      html[data-theme="dark"] body {
+        background: #0a1526;
+      }
+
+      #boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        padding: 32px 26px;
+        box-sizing: border-box;
+        text-align: center;
+
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        color: #5d6b65;
+      }
+      html[data-theme="dark"] #boot {
+        color: #93a4b8;
+      }
+
+      #boot .boot-spinner {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        border: 2.5px solid rgba(14, 124, 90, 0.18);
+        border-top-color: #0e7c5a;
+        animation: boot-spin 0.7s linear infinite;
+      }
+      html[data-theme="dark"] #boot .boot-spinner {
+        border-color: rgba(226, 164, 79, 0.2);
+        border-top-color: #e2a44f;
+      }
+      @keyframes boot-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #boot .boot-spinner {
+          animation-duration: 2s;
+        }
+      }
+
+      /* Compare solo se dopo BOOT_TIMEOUT_MS l'app non si è ancora montata. */
+      #boot .boot-stuck {
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+      }
+      #boot.is-stuck .boot-spinner {
+        display: none;
+      }
+      #boot.is-stuck .boot-stuck {
+        display: flex;
+      }
+
+      #boot .boot-message {
+        margin: 0;
+        max-width: 32ch;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      #boot .boot-retry {
+        appearance: none;
+        border: 0;
+        cursor: pointer;
+        min-height: 50px;
+        padding: 0 28px;
+        border-radius: 16px;
+        font: inherit;
+        font-size: 15px;
+        font-weight: 600;
+        background: #0e7c5a;
+        color: #ffffff;
+      }
+      html[data-theme="dark"] #boot .boot-retry {
+        background: #e2a44f;
+        color: #0a1526;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Il contenuto di #root vive solo finché React non monta: `createRoot`
+         svuota il container al primo render. Serve a coprire la finestra in cui
+         il bundle è ancora in volo — e soprattutto quella in cui non arriverà
+         mai, che senza questo blocco è una schermata bianca senza spiegazioni
+         né via d'uscita (l'ErrorBoundary non può aiutare: React non è partito). -->
+    <div id="root">
+      <div id="boot">
+        <div class="boot-spinner"></div>
+
+        <div class="boot-stuck">
+          <p class="boot-message" id="boot-message"></p>
+          <button type="button" class="boot-retry" id="boot-retry"></button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Se dopo questo tempo #boot è ancora nel DOM, React non è mai partito:
+      // bundle non scaricato (rete assente al rilancio dell'app) oppure
+      // index.html vecchio in cache che punta a un chunk rimosso da un deploy.
+      // In entrambi i casi la cura è la stessa: rileggere la pagina.
+      (function () {
+        var BOOT_TIMEOUT_MS = 8000;
+
+        var italiano = (
+          (navigator.languages && navigator.languages[0]) ||
+          navigator.language ||
+          "en"
+        )
+          .toLowerCase()
+          .indexOf("it") === 0;
+
+        setTimeout(function () {
+          var boot = document.getElementById("boot");
+          if (!boot) return;
+
+          document.getElementById("boot-message").textContent = italiano
+            ? "L'app non si è caricata. Controlla la connessione e riprova."
+            : "The app didn’t load. Check your connection and try again.";
+          document.getElementById("boot-retry").textContent = italiano
+            ? "Riprova"
+            : "Try again";
+          document.getElementById("boot-retry").onclick = function () {
+            window.location.reload();
+          };
+
+          boot.className = "is-stuck";
+        }, BOOT_TIMEOUT_MS);
+      })();
+    </script>
+
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

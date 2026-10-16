@@ -1,0 +1,10 @@
+@use "../../styles/variables" as v;
+
+.more {
+  // La card-lista è il contenuto della schermata: il padding verticale lo
+  // mettono le righe.
+  &__menu {
+    gap: 0;
+    padding: 6px 20px;
+  }
+}

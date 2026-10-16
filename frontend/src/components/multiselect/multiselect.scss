@@ -1,0 +1,125 @@
+@use "../../styles/variables" as v;
+
+.div-multiselect {
+  border-bottom: 1px solid v.$border-color;
+  transition: border-color 0.2s ease;
+
+  &:focus-within {
+    border-bottom-color: v.$bg-button-primary;
+  }
+
+  @media (max-width: v.$mobile) {
+    width: 100%;
+  }
+}
+
+.p-multiselect {
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  width: 100%;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  color: v.$text-main;
+  font-family: v.$font-main;
+  padding: 0.25rem 0;
+
+  &:not(.p-disabled).p-focus {
+    box-shadow: none !important;
+  }
+
+  .p-multiselect-label {
+    padding: 0.5rem 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+
+    &.p-placeholder {
+      color: v.$text-main;
+    }
+  }
+
+  .p-multiselect-trigger {
+    color: v.$text-main;
+  }
+}
+
+/* Chip degli elementi selezionati */
+.p-multiselect-token {
+  background-color: v.$bg-button-primary !important; // Usiamo il primario per coerenza
+  color: v.$text-on-button !important;
+  border-radius: 4px;
+  padding: 0.125rem 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+
+  .p-multiselect-token-icon {
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+}
+
+/* Label sopra il componente */
+.label-multiselect {
+  display: block;
+  margin: 0 0 0.25rem 0;
+  color: v.$text-main;
+  font-family: v.$font-main;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.hidden-multiselect {
+  visibility: hidden;
+}
+
+/* Pannello di selezione (Overlay) */
+.p-multiselect-panel {
+  background-color: v.$bg-card !important;
+  border: 1px solid v.$border-color !important;
+  box-shadow: v.$shadow-color !important;
+
+  .p-multiselect-header {
+    background-color: v.$bg-card;
+    padding: 0.5rem;
+    border-bottom: 1px solid v.$border-color;
+    color: v.$text-main;
+
+    .p-multiselect-filter-container .p-inputtext {
+      background-color: v.$bg-app;
+      border: 1px solid v.$border-color;
+      color: v.$text-main;
+    }
+  }
+
+  .p-multiselect-items {
+    padding: 0.5rem 0;
+
+    .p-multiselect-item {
+      color: v.$text-main;
+      transition: background-color 0.2s;
+
+      &:not(.p-highlight):not(.p-disabled):hover {
+        background-color: v.$bg-app;
+      }
+
+      &.p-highlight {
+        background-color: color-mix(in srgb, v.$bg-button-primary 15%, transparent) !important;
+        color: v.$text-main !important; // Rimosso white per leggibilità in Light Mode
+        font-weight: 600;
+      }
+
+      /* Checkbox interno alla lista del multiselect */
+      .p-checkbox .p-checkbox-box {
+        border-color: v.$border-color;
+        &.p-highlight {
+          background-color: v.$bg-button-primary;
+          border-color: v.$bg-button-primary;
+        }
+      }
+    }
+  }
+}

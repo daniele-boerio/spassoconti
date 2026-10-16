@@ -1,0 +1,86 @@
+@use "../../styles/variables" as v;
+
+.alert {
+  position: fixed;
+  inset: 0;
+  // Ultimo della scala (vedi main.jsx): una conferma deve poter comparire
+  // sopra qualsiasi cosa, incluse le Dialog di PrimeReact.
+  z-index: 1500;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+
+  &__overlay {
+    position: absolute;
+    inset: 0;
+    background: v.$overlay-strong;
+  }
+
+  &__panel {
+    position: relative;
+    width: 326px;
+    max-width: 100%;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    text-align: center;
+
+    padding: 26px 24px 20px;
+    border-radius: v.$r-alert;
+    background: v.$surface;
+    box-shadow: v.$shadow-sheet;
+  }
+
+  &__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    border-radius: v.$r-pill;
+
+    i {
+      font-size: 20px;
+    }
+
+    &--danger {
+      background: v.$negative-soft;
+      color: v.$negative;
+    }
+
+    &--accent {
+      background: v.$accent-soft;
+      color: v.$accent;
+    }
+  }
+
+  &__text {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  &__title {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  &__description {
+    margin: 0;
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: v.$muted;
+  }
+
+  &__actions {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+}

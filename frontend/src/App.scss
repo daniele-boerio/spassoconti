@@ -1,0 +1,392 @@
+// src/App.scss — base globale dell'app.
+//
+// `tokens` emette qui, una volta sola, il blocco `:root` / `[data-theme="dark"]`
+// del design system: gli altri fogli di stile importano solo gli alias SCSS.
+@use "./styles/tokens";
+// Layer di override di PrimeReact sui token: emesso una volta sola, dopo il
+// tema lara importato da main.jsx.
+@use "./styles/primereact";
+// Solo alias: non emette niente. Serve alla sezione desktop in fondo, che ha
+// bisogno delle soglie — `@media` non sa leggere una custom property.
+@use "./styles/variables" as v;
+
+html {
+  // Il tema è già su <html> allo script inline di index.html.
+  background-color: var(--bg);
+
+  // In orizzontale iOS gonfia da solo il testo di certi blocchi: le misure le
+  // decidiamo noi.
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+
+  background-color: var(--bg);
+  color: var(--ink);
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  // Nessuna transizione sui colori: al cambio tema eviterebbe il flash solo
+  // per sostituirlo con un fade altrettanto visibile.
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+// Il pavimento di ogni campo scrivibile. Safari su iPhone ingrandisce la
+// pagina quando prende il fuoco un campo con testo sotto i 16px, e quello zoom
+// resta lì anche dopo che il campo è stato chiuso: l'app finisce tutta
+// ingrandita finché l'utente non la rimpicciolisce a mano. Qui c'è solo la
+// base, per i campi che non si danno una misura loro; chi se la dà deve
+// partire da `v.$fs-field`, non da un numero più piccolo.
+input,
+textarea,
+select {
+  font-size: var(--fs-field);
+}
+
+// Layout comune a tutte le schermate principali: intestazione appiccicata in
+// cima, contenuto che scorre col documento, tab bar fissa in fondo.
+//
+// A scorrere è la pagina, non un riquadro interno: è il modello che regge
+// meglio sui telefoni, dove un contenitore con `overflow: auto` dentro un
+// documento a scroll bloccato litiga con le barre di sistema. La barra in
+// fondo è `fixed` e non occupa spazio nel flusso: glielo tiene il padding
+// di `__content`.
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+
+  &__header {
+    // Resta in vista mentre la pagina scorre: dentro ci sono la ricerca e i
+    // totali, che servono anche a metà lista. Sticky e non fixed: sta nel
+    // flusso, quindi non serve compensarne l'altezza da nessuna parte.
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--bg);
+    /* Considera l'area superiore sicura (es. Dynamic Island) quando presente */
+    padding: calc(20px + env(safe-area-inset-top)) var(--gutter) 14px;
+  }
+
+  &__content {
+    // Lo spazio in fondo tiene il posto della tab bar, che è opaca, fissa e
+    // fuori dal flusso: l'altezza della barra più la safe area che la barra
+    // si aggiunge sotto, più un filo d'aria.
+    padding: 0 var(--gutter)
+      calc(var(--tabbar-h) + 8px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-card);
+  }
+}
+
+// Titolo di pagina: stesso font del resto, in peso da display.
+.page-title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: var(--fs-page-title);
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  line-height: 1.05;
+}
+
+// Il design è a 430px; su schermo largo il contenuto resta in una colonna
+// centrata invece di stirarsi.
+.App {
+  width: 100%;
+  max-width: var(--app-max-width);
+  margin-inline: auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  position: relative;
+  // Contesto di sovrapposizione proprio: la luce di fondo (::before, z-index -1)
+  // resta sopra lo sfondo del body e sotto il contenuto.
+  isolation: isolate;
+}
+
+// COMPATIBILITÀ — DA RIMUOVERE
+// La tab bar sta sopra il contenuto e le schermate non ancora convertite al
+// layout `.page` non lo sanno: lo spazio per non finirci sotto lo mettiamo qui.
+// Solo dove la barra c'è davvero: sull'accesso non esiste, e riservarle
+// spazio lascerebbe un vuoto in fondo alla schermata.
+.App:has(.tab-bar) > *:not(.page):not(.tab-bar) {
+  padding-bottom: calc(var(--tabbar-h) + 8px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+// Ogni cifra è allineata in colonna: segno prima del numero, valuta dopo.
+.amount {
+  font-variant-numeric: tabular-nums;
+}
+
+// --- Scrollbar ---
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: var(--r-pill);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+  background-clip: padding-box;
+}
+
+
+// --- Focus visibile ---
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DESKTOP
+//
+// Dai 900px in su l'app cambia guscio: la tab bar diventa il rail laterale, la
+// colonna da 480px si apre sull'intera larghezza, e il contenuto si dispone su
+// due colonne. Sotto la soglia non cambia niente — è la stessa app di prima,
+// stessi token e stessi componenti: qui non si ridefinisce nessun colore.
+// ─────────────────────────────────────────────────────────────────────────────
+@media (min-width: v.$bp-desktop) {
+  // In riga solo dove il rail c'è davvero: sull'accesso non esiste, e senza
+  // questa guardia la schermata diventerebbe un elemento flex che non si
+  // allarga.
+  .App:has(.nav-rail) {
+    max-width: none;
+    display: flex;
+    align-items: flex-start;
+  }
+
+  // Il rail è `sticky` e alto quanto lo schermo: a scorrere è la pagina, e la
+  // navigazione deve restare ferma accanto.
+  .tab-bar {
+    display: none;
+  }
+
+  // Lo spazio che le schermate non convertite tenevano alla tab bar qui non
+  // serve più: la barra non c'è.
+  .App:has(.tab-bar) > *:not(.page):not(.tab-bar) {
+    padding-bottom: 0;
+  }
+
+  .page {
+    flex: 1;
+    min-width: 0;
+
+    &__header {
+      // Niente safe area: non c'è nessuna tacca da scansare su un desktop.
+      padding: 26px v.$desktop-gutter 0;
+      // Intestazione e contenuto sono la stessa colonna e si allineano.
+      max-width: calc(#{v.$desktop-max} + 2 * #{v.$desktop-gutter});
+      margin-inline: auto;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    &__content {
+      padding: 20px v.$desktop-gutter v.$desktop-gutter;
+      max-width: calc(#{v.$desktop-max} + 2 * #{v.$desktop-gutter});
+      margin-inline: auto;
+      width: 100%;
+      box-sizing: border-box;
+      gap: v.$gap-col;
+    }
+  }
+
+  .page-title {
+    font-size: 40px;
+  }
+}
+
+// Le due colonne. Il contenitore e le colonne spariscono sotto la soglia
+// larga — `display: contents` lascia passare i figli al flusso di sopra — così
+// sul telefono, e sul desktop stretto, le card restano la pila di sempre.
+.page__columns,
+.page__col {
+  display: contents;
+}
+
+@media (min-width: v.$bp-wide) {
+  .page__columns {
+    display: grid;
+    gap: v.$gap-col;
+    align-items: start;
+    min-width: 0;
+
+    &--hero {
+      grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr);
+    }
+
+    &--balanced {
+      grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    }
+
+    // I filtri non sono contenuto: hanno una larghezza loro e non si allargano
+    // con la lista.
+    &--filters {
+      grid-template-columns: minmax(0, 1fr) 296px;
+    }
+  }
+
+  .page__col {
+    display: flex;
+    flex-direction: column;
+    gap: v.$gap-col;
+    min-width: 0;
+  }
+}
+
+// Righe toccabili sotto il mouse: uno sfondo tenue che sborda di qualche pixel
+// (l'ombra piena dello stesso colore), così il testo non si sposta e la riga,
+// che nelle liste non ha padding laterale, non resta a filo.
+@media (hover: hover) {
+  .list-row--tappable,
+  .tx-row,
+  .recurring-row__main,
+  .category-card__head {
+    transition:
+      background-color 150ms ease,
+      box-shadow 150ms ease;
+  }
+
+  .list-row--tappable:hover,
+  .tx-row:hover,
+  .recurring-row__main:hover {
+    background-color: var(--surface-2);
+    box-shadow: 0 0 0 6px var(--surface-2);
+    border-radius: var(--r-icon);
+  }
+
+  .category-card__head:hover {
+    background-color: var(--surface-2);
+  }
+}
+
+// Link per chi naviga da tastiera: salta menu e tab bar e va al contenuto.
+// Invisibile finché non prende il focus.
+.skip-link {
+  position: fixed;
+  top: calc(8px + env(safe-area-inset-top));
+  left: 8px;
+  z-index: 2000;
+  padding: 10px 14px;
+  border-radius: var(--r-field);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+  text-decoration: none;
+
+  // Nascosto davvero finché la tastiera non lo raggiunge. Prima era solo
+  // spostato in su di una quantità fissa: su iPhone, con la barra di stato
+  // trasparente e la safe area, ne restava un pezzo accanto alla Dynamic
+  // Island. Ritagliato a zero non dipende da dove sta.
+  &:not(:focus-visible) {
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+// Tipografia di base: titoli bilanciati su più righe, paragrafi senza parole
+// orfane in fondo.
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+// Entrata del contenuto: le card salgono di poco e compaiono a cascata, invece
+// di montarsi tutte insieme. Solo `transform` e `opacity`, e niente del tutto
+// per chi ha chiesto al sistema di ridurre il movimento.
+@keyframes page-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .page__content > *,
+  .page__column > * {
+    animation: page-rise 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @for $i from 2 through 8 {
+    .page__content > :nth-child(#{$i}),
+    .page__column > :nth-child(#{$i}) {
+      animation-delay: #{($i - 1) * 50}ms;
+    }
+  }
+}
+
+// Phosphor non ha una classe per far girare un'icona: lo spinner la prende da qui.
+@keyframes icon-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.icon-spin {
+  display: inline-block;
+  animation: icon-spin 0.9s linear infinite;
+}
+
+// Sagoma mostrata mentre si scarica il codice di una pagina.
+.route-fallback {
+  padding: calc(24px + env(safe-area-inset-top)) var(--gutter);
+}
+
+// Luce di fondo: un alone tenue dell'accento in alto, perché il fondo non sia
+// una tinta piatta. Fisso e fuori dagli eventi, sotto a tutto il contenuto.
+.App::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    120% 60% at 15% -10%,
+    color-mix(in srgb, var(--accent) 7%, transparent),
+    transparent 60%
+  );
+}

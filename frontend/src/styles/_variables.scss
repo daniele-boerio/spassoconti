@@ -1,0 +1,192 @@
+// src/styles/_variables.scss
+//
+// Mappatura SCSS dei token del design system. I valori veri stanno in
+// `_tokens.scss`, emesso una sola volta da `App.scss`: qui ci sono solo alias,
+// così questo file non produce CSS e può essere `@use`ato da ogni componente
+// senza duplicare il blocco `:root` in ogni foglio di stile.
+
+// ── Etichette ─────────────────────────────────────────────────────────────
+// L'etichetta sopra un numero o una sezione ("Risparmio di ottobre", "Oggi ·
+// 5 ottobre"): minuscolo con l'iniziale maiuscola, peso medio. Il maiuscolo
+// spaziato ovunque urlava e si leggeva peggio.
+@mixin eyebrow {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+// ── Colore ────────────────────────────────────────────────────────────────
+$bg: var(--bg);
+$surface: var(--surface);
+$surface-2: var(--surface-2);
+$ink: var(--ink);
+$muted: var(--muted);
+$muted-2: var(--muted-2);
+$line: var(--line);
+$line-soft: var(--line-soft);
+
+$accent: var(--accent);
+$accent-soft: var(--accent-soft);
+$accent-2: var(--accent-2);
+$on-accent: var(--on-accent);
+
+$positive: var(--positive);
+$positive-soft: var(--positive-soft);
+$negative: var(--negative);
+$negative-soft: var(--negative-soft);
+$negative-line: var(--negative-line);
+
+$toast-bg: var(--toast-bg);
+$toast-ink: var(--toast-ink);
+$toast-meta: var(--toast-meta);
+
+$invert-surface: var(--invert-surface);
+$invert-border: var(--invert-border);
+$invert-ink: var(--invert-ink);
+$invert-meta: var(--invert-meta);
+$invert-fill: var(--invert-fill);
+
+$track: var(--track);
+$bar-past: var(--bar-past);
+$bar-idle: var(--bar-idle);
+$tabbar-bg: var(--tabbar-bg);
+
+$series-1: var(--series-1);
+$series-2: var(--series-2);
+$series-3: var(--series-3);
+$series-4: var(--series-4);
+$series-5: var(--series-5);
+
+// ── Ombre e overlay ───────────────────────────────────────────────────────
+$shadow-card: var(--shadow-card);
+$card-edge: var(--card-edge);
+$font-serif: var(--font-serif);
+$shadow-tabbar: var(--shadow-tabbar);
+$shadow-fab: var(--shadow-fab);
+$shadow-sheet: var(--shadow-sheet);
+$overlay: var(--overlay);
+$overlay-strong: var(--overlay-strong);
+
+// ── Tipografia ────────────────────────────────────────────────────────────
+$font-ui: var(--font-ui);
+$font-display: var(--font-display);
+$fw-display: var(--fw-display);
+$tracking-display: var(--tracking-display);
+
+$fs-hero: var(--fs-hero);
+$lh-hero: var(--lh-hero);
+$tracking-hero: var(--tracking-hero);
+$fs-page-title: var(--fs-page-title);
+$fs-card-title: var(--fs-card-title);
+$fw-card-title: var(--fw-card-title);
+$fs-greeting: var(--fs-greeting);
+$fw-greeting: var(--fw-greeting);
+// Minimo per il testo di un campo scrivibile: sotto, iOS zooma al fuoco.
+$fs-field: var(--fs-field);
+
+// ── Raggi ─────────────────────────────────────────────────────────────────
+$r-card: var(--r-card);
+$r-inner: var(--r-inner);
+$r-field: var(--r-field);
+$r-icon: var(--r-icon);
+$r-sheet: var(--r-sheet);
+$r-alert: var(--r-alert);
+$r-pill: var(--r-pill);
+
+// ── Metrica ───────────────────────────────────────────────────────────────
+$gutter: var(--gutter);
+$gap-card: var(--gap-card);
+$pad-card: var(--pad-card);
+$tabbar-h: var(--tabbar-h);
+$app-max-width: var(--app-max-width);
+$tap-target: var(--tap-target);
+$fs-hero-desktop: var(--fs-hero-desktop);
+$rail-w: var(--rail-w);
+$desktop-max: var(--desktop-max);
+$desktop-gutter: var(--desktop-gutter);
+$gap-col: var(--gap-col);
+
+// ── Soglie ────────────────────────────────────────────────────────────────
+// `$bp-desktop` è il confine fra le due app: sotto c'è il telefono con la tab
+// bar, sopra il rail. `$bp-wide` è dove l'area contenuto ha spazio per la
+// seconda colonna; in mezzo il rail resta e le colonne si impilano.
+//
+// Sono numeri e non custom property perché `@media` non legge `var()`.
+$bp-desktop: 900px;
+$bp-wide: 1180px;
+
+// ── Movimento ─────────────────────────────────────────────────────────────
+// Curva e durata dello slide-up degli sheet.
+$ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+$dur-sheet: 220ms;
+$dur-overlay: 160ms;
+$dur-press: 120ms;
+$transition-fast: 0.15s ease;
+$transition-base: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+// ── Breakpoint ────────────────────────────────────────────────────────────
+$mobile: 480px;
+$tablet: 768px;
+$desktop: 1024px;
+
+// ──────────────────────────────────────────────────────────────────────────
+// COMPATIBILITÀ — DA RIMUOVERE
+//
+// Alias dei vecchi nomi, rimappati sui token nuovi, così le schermate non
+// ancora convertite continuano a compilare e adottano già la nuova palette.
+// Vanno via con la pulizia (step 7 del redesign): quando questo blocco è
+// vuoto la conversione è completa.
+// ──────────────────────────────────────────────────────────────────────────
+$bg-app: var(--bg);
+$bg-dark: var(--line);
+$bg-card: var(--surface);
+$bg-dialog: var(--surface);
+$border-dialog: var(--line);
+$border-table: var(--line);
+$bg-table-paginator-selected: var(--surface-2);
+$bg-datepicker-header: var(--accent);
+$bg-datepicker-today: var(--accent-soft);
+$bg-chips: var(--surface-2);
+$bg-button-primary: var(--accent);
+$bc-button-primary: var(--accent);
+$bg-button-secondary: var(--surface-2);
+$bc-button-secondary: var(--line);
+$bg-gradient-table: var(--surface-2);
+$text-main: var(--ink);
+$text-account: var(--invert-ink);
+$text-on-dark: var(--invert-ink);
+$text-on-button: var(--on-accent);
+$text-muted: var(--muted);
+$text-red: var(--negative);
+$text-green: var(--positive);
+$border-color: var(--line);
+$bar-neutral: var(--ink);
+$bar-gray: var(--track);
+$bar-green: var(--positive);
+$bar-red: var(--negative);
+$btn-light: var(--muted);
+$table-header: var(--surface-2);
+$text-table-header: var(--ink);
+$month-table-header: var(--accent);
+$card-gradient: var(--surface);
+$border-card: var(--line);
+$accent-split: var(--accent);
+$accent-split-hover: var(--accent);
+$light-blue: var(--accent);
+$light-gray: var(--muted);
+$red: var(--negative);
+$green: var(--positive);
+$shadow-color: var(--shadow-card);
+$surface-hover: var(--surface-2);
+$font-main: var(--font-ui);
+
+$radius-sm: 8px;
+$radius-md: var(--r-icon);
+$radius-lg: var(--r-field);
+$radius-xl: var(--r-card);
+$radius-pill: var(--r-pill);
+$shadow-xs: var(--shadow-card);
+$shadow-sm: var(--shadow-card);
+$shadow-md: var(--shadow-card);
+$shadow-lg: var(--shadow-sheet);

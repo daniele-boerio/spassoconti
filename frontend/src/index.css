@@ -1,0 +1,25 @@
+/* A scorrere è il documento, non un riquadro dentro la pagina.
+   `dvh` è l'altezza che resta davvero visibile: su iOS `vh` conta anche la
+   fascia coperta dalle barre di sistema. La riga in `vh` resta come ripiego.
+   Nessuna altezza fissa: un'altezza calcolata può venire zero — e un'app alta
+   zero è una schermata vuota. */
+html,
+body,
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  /* Toglie lo zoom da doppio tocco, e con lui i 300 ms di attesa prima che un
+     tocco diventi un clic. Il pinch resta: chi ha bisogno di ingrandire può. */
+  touch-action: manipulation;
+}
+
+/* Ensure fixed elements (tab bar) are painted above the page content */
+.tab-bar {
+  box-sizing: border-box;
+}
+

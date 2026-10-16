@@ -1,0 +1,40 @@
+@use "../../styles/variables" as v;
+
+.segmented {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: v.$r-pill;
+  background: v.$surface-2;
+
+  &__option {
+    flex: 1;
+    // Il design dà 10px di padding: il minimo tocco di 44px alza il segmento di
+    // qualche pixel, ed è il vincolo che vince.
+    min-height: v.$tap-target;
+    padding: 10px 8px;
+
+    border: 0;
+    border-radius: v.$r-pill;
+    background: transparent;
+    cursor: pointer;
+
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: v.$muted;
+    text-align: center;
+
+    &[aria-checked="true"] {
+      background: v.$surface;
+      box-shadow: v.$shadow-card;
+      font-weight: 700;
+      color: v.$ink;
+    }
+
+    &:active {
+      transform: scale(0.97);
+      transition: transform v.$dur-press;
+    }
+  }
+}

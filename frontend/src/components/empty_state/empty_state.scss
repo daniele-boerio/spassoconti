@@ -1,0 +1,87 @@
+@use "../../styles/variables" as v;
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+
+  padding: 34px 24px;
+  border-radius: v.$r-card;
+  background: v.$surface;
+  box-shadow: v.$shadow-card;
+  border: v.$card-edge;
+
+  &__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 18px;
+    background: v.$accent-soft;
+    color: v.$accent;
+
+    i {
+      font-size: 20px;
+    }
+  }
+
+  &__text {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  &__title {
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  &__description {
+    margin: 0;
+    max-width: 30ch;
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: v.$muted;
+  }
+
+  &__actions {
+    display: flex;
+    gap: 9px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  // Ricerca senza risultati: più compatta, icona neutra.
+  &--search {
+    padding: 26px 24px;
+    gap: 12px;
+
+    .empty-state__icon {
+      width: 46px;
+      height: 46px;
+      border-radius: v.$r-field;
+      background: v.$surface-2;
+      color: v.$muted;
+
+      i {
+        font-size: 18px;
+      }
+    }
+
+    .empty-state__text {
+      gap: 5px;
+    }
+
+    .empty-state__title {
+      font-size: 15.5px;
+    }
+
+    .empty-state__description {
+      font-size: 13px;
+      line-height: 1.4;
+    }
+  }
+}

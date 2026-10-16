@@ -1,0 +1,55 @@
+@use "../../styles/variables" as v;
+
+.div-checkbox {
+  display: flex;
+  align-items: center;
+
+  &.invisible {
+    display: none;
+  }
+}
+
+.label-checkbox,
+.label-no-translate-checkbox {
+  margin: 0 0 0 1rem;
+  color: v.$text-main; // Aggiunto per coerenza con il tema
+  font-family: v.$font-main;
+  font-size: 0.9rem;
+}
+
+// Personalizzazione PrimeReact Checkbox
+.p-checkbox.p-component {
+  display: flex;
+  align-items: center;
+
+  .p-checkbox-box {
+    // Stato base (non selezionato)
+    border: 1px solid v.$border-color !important;
+    background-color: v.$bg-app !important;
+    border-radius: 4px; // Un piccolo arrotondamento sta bene con il tuo radius-lg
+    transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
+
+    &:hover {
+      border-color: v.$bg-button-primary !important;
+    }
+  }
+
+  // Stato selezionato (Highlight)
+  &.p-highlight {
+    .p-checkbox-box {
+      border-color: v.$bg-button-primary !important;
+      background-color: v.$bg-button-primary !important;
+    }
+  }
+
+  // Stato Focus
+  &:not(.p-checkbox-disabled) .p-checkbox-box.p-focus {
+    box-shadow: 0 0 0 0.2rem color-mix(in srgb, v.$bg-button-primary 25%, transparent) !important;
+    border-color: v.$bg-button-primary !important;
+  }
+}
+
+// Nascondi l'icona interna (il check) come nel tuo originale
+.p-checkbox .p-checkbox-icon {
+  display: none !important;
+}

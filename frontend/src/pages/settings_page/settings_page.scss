@@ -1,0 +1,278 @@
+@use "../../styles/variables" as v;
+
+.settings-card {
+  background: v.$surface;
+  border-radius: v.$r-card;
+  padding: v.$pad-card;
+  box-shadow: v.$shadow-card;
+  border: v.$card-edge;
+}
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  &__title {
+    margin: 0 0 0 4px;
+    @include v.eyebrow;
+    color: v.$muted;
+  }
+}
+
+.settings-profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+
+  &__avatar {
+    flex: 0 0 auto;
+    width: 52px;
+    height: 52px;
+    border-radius: v.$r-icon;
+    background: v.$accent-soft;
+    color: v.$accent;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 16px;
+    font-weight: 800;
+  }
+
+  &__identity {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__name {
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  &__email {
+    font-size: 12.5px;
+    color: v.$muted;
+  }
+}
+
+// Tre anteprime affiancate: la selezione si legge dal bordo accento.
+.theme-picker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+
+  &__option {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 0;
+
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+
+    &[aria-checked="true"] {
+      .theme-picker__preview {
+        border-color: v.$accent;
+        border-width: 2px;
+      }
+
+      .theme-picker__label {
+        color: v.$accent;
+        font-weight: 700;
+      }
+    }
+
+    &:active {
+      transform: scale(0.97);
+      transition: transform v.$dur-press;
+    }
+  }
+
+  &__preview {
+    height: 56px;
+    border-radius: v.$r-icon;
+    border: 1px solid v.$line;
+  }
+
+  &__option--light &__preview {
+    background: var(--preview-light);
+  }
+
+  &__option--dark &__preview {
+    background: var(--preview-dark);
+  }
+
+  // "Sistema" mostra i due temi divisi a metà.
+  &__option--system &__preview {
+    background: linear-gradient(
+      120deg,
+      var(--preview-light) 0 50%,
+      var(--preview-dark) 50% 100%
+    );
+  }
+
+  &__label {
+    font-size: 12px;
+    font-weight: 600;
+    color: v.$muted;
+    text-align: center;
+  }
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: v.$tap-target;
+  cursor: pointer;
+
+  // Come riga-bottone perde gli stili nativi del button.
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+
+  &__text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__label {
+    font-size: 14.5px;
+    font-weight: 600;
+  }
+
+  &__value {
+    flex: 0 0 auto;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  &--tappable:active {
+    transform: scale(0.97);
+    transition: transform v.$dur-press;
+  }
+
+  & > .ph-caret-right {
+    flex: 0 0 auto;
+    font-size: 12px;
+    color: v.$muted-2;
+  }
+
+  &__hint {
+    font-size: 12px;
+    color: v.$muted;
+  }
+}
+
+// Interruttore 46×28 con pallino da 22.
+
+.settings-logout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  min-height: 54px;
+  border: 1px solid v.$line;
+  border-radius: v.$r-field;
+  background: v.$surface;
+  color: v.$negative;
+
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:active {
+    transform: scale(0.97);
+    transition: transform v.$dur-press;
+  }
+}
+
+// Campo importo dello sheet "Budget di spesa": il numero è il protagonista.
+.budget-field {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+
+  &__input {
+    width: 100%;
+    max-width: 240px;
+
+    border: 0;
+    background: transparent;
+    color: v.$ink;
+
+    font-family: inherit;
+    font-size: 40px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+
+    &::placeholder {
+      color: v.$muted-2;
+      font-weight: 700;
+    }
+
+    &:focus {
+      outline: none;
+    }
+  }
+
+  &__currency {
+    font-size: 22px;
+    color: v.$muted-2;
+  }
+
+  &__hint {
+    margin: 0;
+    font-size: 12.5px;
+    color: v.$muted;
+    text-align: center;
+  }
+}
+
+.budget-field__hint--error {
+  color: v.$negative;
+}
+
+.settings-page {
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  &__back {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: v.$tap-target;
+    height: v.$tap-target;
+    margin-left: -10px;
+
+    border: 0;
+    background: transparent;
+    color: v.$ink;
+    cursor: pointer;
+
+    i {
+      font-size: 16px;
+    }
+  }
+}

@@ -1,0 +1,187 @@
+@use "../../../styles/variables" as v;
+
+.year-card {
+  gap: 18px;
+
+  &__heading {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  &__title {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  &__subtitle {
+    font-size: 12.5px;
+    color: v.$muted;
+
+    strong .amount {
+      color: v.$positive;
+      font-weight: 700;
+    }
+  }
+}
+
+// ── Entrate e uscite, due barre per mese ────────────────────────────────────
+.year-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 9px;
+  height: 158px;
+
+  &__group {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__pair {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    width: 100%;
+    height: 130px;
+  }
+
+  &__bar {
+    flex: 1;
+    border-radius: 6px 6px 0 0;
+    // Una barra a zero deve restare visibile come "zero", non sparire.
+    min-height: 2px;
+
+    &--in {
+      background: v.$accent;
+    }
+
+    &--out {
+      background: v.$surface-2;
+    }
+
+    // Il mese in corso è ancora incompleto: si distingue dagli altri.
+    &--current {
+      background: v.$accent-2;
+    }
+  }
+
+  &__label {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: v.$muted-2;
+    text-transform: capitalize;
+
+    &--current {
+      color: v.$ink;
+      font-weight: 700;
+    }
+  }
+
+  // Da nove mesi in su: con le spaziature piene le dodici coppie di barre
+  // escono dalla card, e le sigle dei mesi si toccano.
+  &--dense {
+    gap: 5px;
+
+    .year-bars__pair {
+      gap: 2px;
+    }
+
+    .year-bars__label {
+      font-size: 9.5px;
+    }
+  }
+}
+
+.year-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 12px;
+  color: v.$muted;
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  &__dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+
+    &--in {
+      background: v.$accent;
+    }
+
+    &--out {
+      background: v.$surface-2;
+    }
+
+    &--current {
+      background: v.$accent-2;
+    }
+  }
+}
+
+// ── Trend del risparmio ─────────────────────────────────────────────────────
+// Del grafico della tendenza resta qui solo il gagliardetto accanto al
+// titolo: linea, area, etichette e lettura al tocco stanno in
+// `components/charts/trend_chart`, condiviso con la vista Grafici.
+.year-trend {
+  &__badge {
+    font-size: 11.5px;
+    font-weight: 700;
+
+    &--up {
+      color: v.$positive;
+    }
+
+    &--down {
+      color: v.$negative;
+    }
+  }
+}
+
+// ── Tabella dei totali ──────────────────────────────────────────────────────
+.year-totals {
+  gap: 0;
+  padding: 6px 20px;
+
+  &__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 0;
+
+    & + & {
+      border-top: 1px solid v.$line-soft;
+    }
+  }
+
+  &__label {
+    font-size: 13.5px;
+    color: v.$muted;
+  }
+
+  &__value {
+    font-size: 14.5px;
+    font-weight: 700;
+  }
+
+  &__row--net &__label {
+    color: v.$ink;
+    font-weight: 700;
+  }
+
+  &__net {
+    font-size: 16px;
+    font-weight: 800;
+  }
+}

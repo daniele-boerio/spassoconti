@@ -1,0 +1,38 @@
+@use "../../styles/variables" as v;
+
+/* Wrapper del componente */
+.p-inputswitch {
+  width: 3rem;
+  height: 1.7rem;
+}
+// Il pallino usa `--knob`, lo stesso token del toggle di components/toggle:
+// resta bianco nei due temi. Prima prendeva il colore della card e al buio
+// diventava un blu quasi nero sopra all'ambra — sembrava un buco, e i due
+// interruttori dell'app non si somigliavano più.
+.p-inputswitch.p-highlight .p-inputswitch-slider {
+  background-color: v.$bg-button-primary !important;
+  &:before {
+    background-color: var(--knob) !important;
+  }
+}
+
+.p-inputswitch .p-inputswitch-slider {
+  background-color: v.$bar-gray !important;
+  &:before {
+    background-color: var(--knob) !important;
+  }
+}
+
+.p-inputswitch:not(.p-disabled):focus-within .p-inputswitch-slider {
+  box-shadow: none !important;
+}
+
+/* Label sopra lo switch */
+.label-switch {
+  display: block;
+  margin: 0 0 5px 0;
+  color: v.$text-main;
+  font-family: v.$font-main;
+  font-size: 0.85rem;
+  font-weight: 600;
+}

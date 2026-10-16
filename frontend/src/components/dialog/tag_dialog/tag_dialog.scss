@@ -1,0 +1,85 @@
+@use "../../../styles/variables.scss" as v;
+
+.tag-dialog {
+  // Impostiamo un'altezza minima per evitare che la dialog "salti"
+  // quando si nascondono le sottocategorie
+  .p-dialog-content {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .tag-settings-dialog-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding-top: 1rem;
+
+    .selector-div {
+      display: flex;
+      flex: 1;
+      justify-content: center;
+      margin-bottom: 1rem;
+      .selector {
+        display: flex;
+        flex: 1;
+        .p-button {
+          display: flex;
+          flex: 1;
+        }
+      }
+    }
+
+    // Stile per rendere il SelectButton largo quanto la dialog
+    .type-selector-container {
+      width: 100%;
+      margin-bottom: 1rem;
+
+      .p-selectbutton {
+        display: flex;
+        width: 100%;
+
+        .p-button {
+          flex: 1; // Forza i bottoni a dividersi lo spazio 50/50
+          justify-content: center;
+          font-weight: 600;
+          border: 1px solid v.$bar-neutral;
+          background: transparent;
+
+          &:focus {
+            box-shadow: none;
+          }
+        }
+      }
+    }
+  }
+
+  .buttons-footer-dialog {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding-top: 1rem;
+
+    .div-button {
+      flex: 1;
+
+      button {
+        width: 100%;
+        max-width: 100%;
+      }
+    }
+
+    // Stile specifico per il tasto "Crea" per distinguerlo dal "Salva"
+    .p-button:not(.reset-button) {
+      border: none;
+
+      &:hover {
+        filter: brightness(1.1);
+      }
+    }
+  }
+
+  // Assicuriamoci che l'InputText occupi tutto lo spazio
+  .main-tag-section {
+    width: 100%;
+  }
+}

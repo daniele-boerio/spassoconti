@@ -1,0 +1,169 @@
+@use "../../../styles/variables" as v;
+
+.profile {
+  &__identity {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  &__avatar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+
+    border-radius: v.$r-icon;
+    background: v.$accent-soft;
+    color: v.$accent;
+    font-size: 17px;
+    font-weight: 800;
+  }
+
+  &__text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__name {
+    font-size: 16px;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__email {
+    font-size: 12.5px;
+    color: v.$muted;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__rows {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: v.$tap-target;
+    padding: 14px 16px;
+
+    border: 0;
+    border-radius: v.$r-field;
+    background: v.$bg;
+    color: inherit;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    > i {
+      flex: 0 0 auto;
+      font-size: 14px;
+      color: v.$muted-2;
+    }
+
+    &:active {
+      transform: scale(0.99);
+      transition: transform v.$dur-press;
+    }
+  }
+
+  &__row-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    font-size: 14.5px;
+    font-weight: 600;
+  }
+
+  &__hint {
+    font-size: 12px;
+    font-weight: 400;
+    color: v.$muted;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__chevron {
+    font-size: 12px;
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  &__label {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: v.$muted;
+  }
+
+  &__control {
+    display: flex;
+    align-items: center;
+    min-height: v.$tap-target;
+    padding: 15px 16px;
+
+    box-sizing: border-box;
+    border-radius: v.$r-field;
+    background: v.$bg;
+
+    input {
+      flex: 1;
+      min-width: 0;
+      border: 0;
+      background: transparent;
+      color: v.$ink;
+      font-family: inherit;
+      font-size: v.$fs-field;
+
+      &:focus {
+        outline: none;
+      }
+    }
+  }
+
+  &__actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  // L'uscita è l'ultima cosa: distruttiva ma tranquilla, come in Impostazioni.
+  &__logout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: v.$tap-target;
+    padding: 15px;
+
+    border: 1px solid v.$line;
+    border-radius: v.$r-field;
+    background: v.$surface;
+    color: v.$negative;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+
+    i {
+      font-size: 14px;
+    }
+  }
+}

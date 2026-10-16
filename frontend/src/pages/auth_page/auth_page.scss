@@ -1,0 +1,176 @@
+@use "../../styles/variables" as v;
+
+.auth {
+  min-height: 100dvh;
+  background: v.$bg;
+
+  &__form {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 32px;
+
+    min-height: 100dvh;
+    padding: 64px 24px calc(32px + env(safe-area-inset-bottom));
+  }
+
+  &__intro {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  &__logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    margin-bottom: 20px;
+
+    border-radius: 18px;
+    background: v.$accent;
+    color: v.$on-accent;
+    font-size: 24px;
+    font-weight: 800;
+  }
+
+  &__title {
+    margin: 0;
+    font-family: v.$font-serif;
+    font-size: 40px;
+    font-weight: 400;
+    letter-spacing: -0.015em;
+    line-height: 1.05;
+  }
+
+  &__subtitle {
+    margin: 0;
+    font-size: 14.5px;
+    color: v.$muted;
+  }
+
+  &__fields {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  &__label {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: v.$muted;
+  }
+
+  &__control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 15px 16px;
+
+    // Senza questo il campo esce dalla colonna appena c'è un padding.
+    box-sizing: border-box;
+    width: 100%;
+
+    border: 1px solid v.$line;
+    border-radius: v.$r-field;
+    background: v.$surface;
+
+    &:focus-within {
+      border-color: v.$accent;
+    }
+
+    input {
+      flex: 1;
+      min-width: 0;
+      border: 0;
+      background: transparent;
+      color: v.$ink;
+      font-family: inherit;
+      font-size: v.$fs-field;
+
+      &::placeholder {
+        color: v.$muted-2;
+      }
+
+      &:focus {
+        outline: none;
+      }
+    }
+  }
+
+  &__icon {
+    flex: 0 0 auto;
+    font-size: 14px;
+    color: v.$muted-2;
+  }
+
+  &__reveal {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    margin: -6px -6px -6px 0;
+
+    border: 0;
+    background: transparent;
+    color: v.$muted-2;
+    cursor: pointer;
+
+    i {
+      font-size: 14px;
+    }
+  }
+
+  &__forgot {
+    align-self: flex-end;
+    padding: 4px 0;
+
+    border: 0;
+    background: transparent;
+    color: v.$accent;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  &__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  &__switch {
+    margin: 0;
+    text-align: center;
+    font-size: 13.5px;
+    color: v.$muted;
+
+    button {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: v.$accent;
+      font-family: inherit;
+      font-size: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+  }
+}
+
+// La schermata di accesso vive fuori dalla colonna dell'app: su schermo largo
+// si centra da sé.
+.auth__form {
+  max-width: v.$app-max-width;
+  margin-inline: auto;
+}

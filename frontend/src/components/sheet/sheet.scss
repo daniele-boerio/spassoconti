@@ -1,0 +1,205 @@
+@use "../../styles/variables" as v;
+
+.sheet {
+  // Il riquadro dove lo sheet può stare. `bottom` lo riscrive sheet.tsx quando
+  // la tastiera è aperta: da lì in giù lo schermo è coperto dai tasti, e il
+  // pannello — ancorato al fondo di questo riquadro — si accorcia invece di
+  // finirci sotto.
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+
+  // Lo scurito resta a tutto schermo anche quando il riquadro si accorcia.
+  &__overlay {
+    position: fixed;
+    inset: 0;
+    background: v.$overlay;
+    animation: sheet-fade v.$dur-overlay ease-out;
+  }
+
+  // Lo sheet vive nella stessa colonna dell'app, non a tutto schermo.
+  &__panel {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    transform: translateX(-50%);
+
+    width: 100%;
+    max-width: v.$app-max-width;
+    max-height: 92%;
+
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    padding: 14px 20px calc(24px + env(safe-area-inset-bottom));
+    border-radius: v.$r-sheet v.$r-sheet 0 0;
+    background: v.$surface;
+    box-shadow: v.$shadow-sheet;
+
+    animation: sheet-up v.$dur-sheet v.$ease-sheet;
+    transition: transform v.$dur-sheet v.$ease-sheet;
+
+    &:focus {
+      outline: none;
+    }
+
+    // Con la tastiera aperta la maschera in fondo non c'è più: lo spazio che
+    // le tenevamo diventa un vuoto tra il bottone di conferma e i tasti.
+    &--keyboard {
+      padding-bottom: 16px;
+      // Il pannello arriva quasi in cima: sopra la tastiera lo spazio è poco e
+      // va speso tutto per i campi.
+      max-height: 100%;
+    }
+  }
+
+  &__handle {
+    flex: 0 0 auto;
+    align-self: center;
+    width: 44px;
+    height: 4px;
+    border-radius: v.$r-pill;
+    background: v.$surface-2;
+    cursor: grab;
+    touch-action: none;
+    // Il pezzo da afferrare è più grande di quello che si vede.
+    padding: 10px 0;
+    background-clip: content-box;
+    box-sizing: content-box;
+  }
+
+  &__header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  &__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: v.$tap-target;
+    height: v.$tap-target;
+    margin-right: -10px;
+
+    border: 0;
+    background: transparent;
+    color: v.$muted;
+    cursor: pointer;
+
+    i {
+      font-size: 15px;
+    }
+  }
+
+  &__body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  &__footer {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 9px;
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateX(-50%) translateY(100%);
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes sheet-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet__panel,
+  .sheet__overlay {
+    animation: none;
+  }
+}
+
+// ── Desktop ─────────────────────────────────────────────────────────────────
+// Lo sheet che sale dal fondo è una cosa da pollice: su desktop il posto giusto
+// è il centro dello schermo, e il pannello diventa un dialog da 520px. Sotto la
+// soglia non cambia nulla — animazione, maniglia e trascinamento restano.
+@media (min-width: v.$bp-desktop) {
+  .sheet {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &__panel {
+      position: relative;
+      left: auto;
+      bottom: auto;
+      transform: none;
+
+      width: 520px;
+      max-width: calc(100vw - 48px);
+      max-height: min(86vh, 760px);
+
+      padding: 28px;
+      border-radius: v.$r-alert;
+
+      animation: dialog-in v.$dur-sheet v.$ease-sheet;
+
+      // La maniglia serve a trascinare col dito: con il mouse non si trascina
+      // niente, e resterebbe un trattino senza funzione.
+      &--keyboard {
+        padding-bottom: 28px;
+        max-height: min(86vh, 760px);
+      }
+    }
+
+    &__handle {
+      display: none;
+    }
+
+    &__body {
+      gap: 16px;
+    }
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

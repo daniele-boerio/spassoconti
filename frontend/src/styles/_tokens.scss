@@ -1,0 +1,217 @@
+// src/styles/_tokens.scss
+//
+// Design system SpassoConto — blocco unico di token, due temi.
+// Regola: nessun componente contiene un colore letterale, solo `var(--…)`.
+//
+// Il tema si applica scrivendo `data-theme="light" | "dark"` su <html>.
+// La preferenza dell'utente ("system" inclusa) vive in localStorage e viene
+// risolta in JS (src/features/ui/theme.ts) prima del primo paint, così qui
+// bastano esattamente due blocchi di variabili.
+
+:root {
+  // ── Colore — tema chiaro (Menta) ────────────────────────────────────────
+  --bg: #f6f8f7;
+  --surface: #ffffff;
+  --surface-2: #eef1f0;
+  --ink: #12211c;
+  --muted: #5d6b65;
+  --muted-2: #68786f;
+  --line: #e8ecea;
+  --line-soft: #f1f4f3;
+
+  --accent: #0e7c5a;
+  --accent-soft: #e4f2ec;
+  // Accento secondario: segmento "previsto" del budget, "accantonato",
+  // mese corrente nei grafici a barre.
+  --accent-2: #9ed9c1;
+  --on-accent: #ffffff;
+
+  --positive: #0e7c5a;
+  --positive-soft: #e4f2ec;
+  --negative: #c2513c;
+  --negative-soft: #f4ece7;
+  // Bordo delle card di allerta (ricorrenze scadute, righe da rivedere).
+  --negative-line: #eddcd4;
+
+  // Il toast si legge da solo: fondo pieno in entrambi i temi, perché è
+  // l'unica cosa che compare sopra al contenuto senza un overlay dietro.
+  --toast-bg: #0f2e24;
+  --toast-ink: #eaf3ef;
+  --toast-meta: #9ed9c1;
+
+  // Card "In arrivo": superficie invertita.
+  // Card "in evidenza" (In arrivo, Impegno fisso): un verde tenue della stessa
+  // famiglia dell'accento, non un blocco scuro in mezzo a una pagina chiara.
+  --invert-surface: #e4f2ec;
+  --invert-border: #cfe6db;
+  --invert-ink: #12211c;
+  --invert-meta: #0e6a4d;
+  --invert-fill: rgba(14, 124, 90, 0.1);
+
+  // Riempimenti di barre e track.
+  --track: #eef1f0;
+  --bar-past: #e4f2ec;
+  --bar-idle: #eef1f0;
+
+  --tabbar-bg: #ffffff;
+  // Chip filtro selezionato: al chiaro è un blocco scuro, al buio è l'accento.
+  --chip-active-bg: #0f2e24;
+  --chip-active-ink: #ffffff;
+
+  // Anteprime del selettore tema in Impostazioni: mostrano gli *altri* temi,
+  // quindi restano identiche nei due blocchi. Sono gli unici colori che non
+  // seguono il tema attivo.
+  --preview-light: #f6f8f7;
+  --preview-dark: #0a1526;
+  // Il pallino del toggle resta bianco in entrambi i temi.
+  --knob: #ffffff;
+
+  // Serie grafici, nell'ordine (per categoria).
+  --series-1: #0e7c5a;
+  --series-2: #3f9d7f;
+  --series-3: #6fbba1;
+  --series-4: #9ed9c1;
+  --series-5: #c2513c;
+
+  // ── Ombre e overlay ─────────────────────────────────────────────────────
+  --shadow-card: none;
+  // Il bordo che separa una card dal fondo, al posto dell'ombra.
+  --card-edge: 1px solid var(--line);
+  --shadow-tabbar: 0 -8px 20px -12px rgba(18, 33, 28, 0.25);
+  --shadow-fab: 0 10px 22px -8px rgba(14, 124, 90, 0.7);
+  --shadow-sheet: 0 -12px 40px -16px rgba(18, 33, 28, 0.3);
+  --overlay: rgba(18, 33, 28, 0.45);
+  --overlay-strong: rgba(18, 33, 28, 0.5);
+
+  // ── Tipografia ──────────────────────────────────────────────────────────
+  --font-ui:
+    "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
+  // Titoli e numeroni: stesso font del resto dell'app, in peso più alto. Un
+  // solo carattere ovunque, in tutti e due i temi.
+  --font-display: var(--font-ui);
+  // Serif editoriale per i titoli di pagina: dà una voce all'app senza toccare
+  // i numeri, che restano nel sans con cifre tabellari.
+  --font-serif: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --fw-display: 800;
+  --tracking-display: -0.03em;
+
+  // Ruoli che cambiano misura tra i due temi.
+  --fs-hero: 46px;
+  --lh-hero: 1;
+  --tracking-hero: -0.04em;
+  --fs-page-title: 34px;
+  --fs-card-title: 15px;
+  --fw-card-title: 700;
+  --fs-greeting: 17px;
+  --fw-greeting: 700;
+
+  // Misura minima del testo dentro un campo scrivibile. Non è gusto: sotto i
+  // 16px Safari su iPhone ingrandisce la pagina quando il campo prende il
+  // fuoco, e da quello zoom non torna più indietro da solo. Ogni input e ogni
+  // textarea parte da qui, mai da un numero suo.
+  --fs-field: 16px;
+
+  // ── Raggi ───────────────────────────────────────────────────────────────
+  --r-card: 18px;
+  --r-inner: 14px;
+  --r-field: 12px;
+  --r-icon: 10px;
+  --r-sheet: 24px;
+  --r-alert: 20px;
+  --r-pill: 999px;
+
+  // ── Metrica di layout ───────────────────────────────────────────────────
+  --gutter: 20px;
+  --gap-card: 14px;
+  --pad-card: 20px;
+  // Altezza della tab bar **senza** la safe area, che la barra si aggiunge da
+  // sé sotto. La dichiara questo token e la usano in due: la barra, che la
+  // prende come altezza minima, e il contenuto, che le tiene il posto. Prima
+  // la misurava uno script a runtime, e le due formule si erano scollate.
+  --tabbar-h: 66px;
+  // Larghezza di riferimento del design; sotto la soglia desktop il contenuto
+  // resta centrato in una colonna di questa misura.
+  --app-max-width: 480px;
+  --tap-target: 44px;
+
+  // ── Desktop ───────────────────────────────────────────────────────────────
+  // Da 900px in su la tab bar diventa un rail laterale e i contenuti si
+  // dispongono su due colonne. Sotto, l'app è quella di sempre: stessi token,
+  // stessi componenti, nessuna densità da back-office.
+  --rail-w: 248px;
+  // Larghezza massima dell'area contenuto, rail escluso.
+  --desktop-max: 1180px;
+  --desktop-gutter: 32px;
+  --gap-col: 20px;
+  // Il numero protagonista cresce con lo spazio che c'è.
+  --fs-hero-desktop: 58px;
+
+  // PrimeReact legge queste due dal proprio tema: le riportiamo sui nostri
+  // token. Funziona perché il tema lara è importato prima di App.scss.
+  --font-family: var(--font-ui);
+  --maskbg: var(--overlay);
+}
+
+[data-theme="dark"] {
+  // ── Colore — tema scuro (Notte) ─────────────────────────────────────────
+  --bg: #0a1526;
+  --surface: #101f38;
+  --surface-2: #16294a;
+  --ink: #eaf0f8;
+  --muted: #8fa2bd;
+  --muted-2: #6a7d99;
+  --line: rgba(255, 255, 255, 0.1);
+  --line-soft: rgba(255, 255, 255, 0.06);
+
+  --accent: #e2a44f;
+  --accent-soft: rgba(226, 164, 79, 0.14);
+  --accent-2: rgba(226, 164, 79, 0.35);
+  --on-accent: #10203a;
+
+  --positive: #5ec98f;
+  --positive-soft: rgba(94, 201, 143, 0.14);
+  --negative: #e4796b;
+  --negative-soft: rgba(228, 121, 107, 0.16);
+  --negative-line: rgba(228, 121, 107, 0.28);
+
+  --toast-bg: #16294a;
+  --toast-ink: #eaf0f8;
+  --toast-meta: #e2a44f;
+
+  // Al buio la card "In arrivo" non ha fondo: la disegna solo il bordo.
+  --invert-surface: transparent;
+  --invert-border: rgba(226, 164, 79, 0.28);
+  --invert-ink: var(--ink);
+  --invert-meta: var(--muted);
+  --invert-fill: rgba(255, 255, 255, 0.06);
+
+  --track: rgba(255, 255, 255, 0.09);
+  --bar-past: rgba(226, 164, 79, 0.24);
+  --bar-idle: rgba(255, 255, 255, 0.07);
+
+  // Al buio la tab bar si fonde con lo sfondo pagina.
+  --tabbar-bg: #0a1526;
+  --chip-active-bg: var(--accent);
+  --chip-active-ink: var(--on-accent);
+
+  --preview-light: #f6f8f7;
+  --preview-dark: #0a1526;
+  --knob: #ffffff;
+
+  --series-1: #e2a44f;
+  --series-2: #c98d3f;
+  --series-3: #a97633;
+  --series-4: #5ec98f;
+  --series-5: #e4796b;
+
+  // Le card non hanno ombra: si separano con --surface.
+  --shadow-card: none;
+  --shadow-tabbar: 0 -8px 20px -12px rgba(0, 0, 0, 0.6);
+  --shadow-fab: 0 10px 22px -8px rgba(226, 164, 79, 0.6);
+  --shadow-sheet: 0 -12px 40px -16px rgba(0, 0, 0, 0.7);
+  --overlay: rgba(3, 10, 20, 0.55);
+  --overlay-strong: rgba(3, 10, 20, 0.62);
+
+  // La tipografia non cambia col tema: cambia solo il colore.
+}

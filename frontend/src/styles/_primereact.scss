@@ -1,0 +1,633 @@
+// src/styles/_primereact.scss
+//
+// PrimeReact resta solo dove porta logica vera — date picker, dropdown con
+// filtro, overlay. Il suo tema `lara` ha i colori hard-coded (non segue le
+// custom properties), quindi la palette la rimettiamo qui, sempre su token.
+//
+// Emesso una volta sola da App.scss, che viene dopo il tema lara nel bundle.
+//
+// ── Perché tutto sta dentro un blocco `:root` ─────────────────────────────
+// A parità di peso vince chi viene dopo, e noi veniamo dopo: finché i due
+// selettori pesano uguale basta. Ma lara qualifica i suoi con più classi di
+// quante ne scrivevamo qui —
+//
+//   .p-datepicker:not(.p-datepicker-inline)                    → 2 classi
+//   .p-stepper.p-stepper-vertical .p-stepper-toggleable-content → 3 classi
+//   .p-stepper .p-stepper-header .p-stepper-action              → 3 classi
+//
+// — e contro quelli il nostro `.p-datepicker { background: … }` perdeva in
+// silenzio: restava il bianco del tema chiaro anche a tema scuro. Era questo
+// il pannello bianco del calendario e lo sfondo bianco dei passi del rimborso.
+// `:root` davanti vale esattamente una classe in più: quanto basta per stare
+// sopra a lara ovunque, senza spargere `!important` (che invece toglierebbe ai
+// singoli componenti la possibilità di ritoccare il proprio caso).
+@use "./variables" as v;
+
+:root {
+  // ── Campi ───────────────────────────────────────────────────────────────
+  .p-inputtext,
+  .p-inputtextarea,
+  .p-dropdown,
+  .p-multiselect,
+  .p-inputnumber-input,
+  .p-password-input {
+    background: v.$surface;
+    border: 1px solid v.$line;
+    border-radius: v.$r-field;
+    color: v.$ink;
+    font-family: v.$font-ui;
+    font-size: v.$fs-field;
+
+    &::placeholder {
+      color: v.$muted-2;
+    }
+
+    &:enabled:hover {
+      border-color: v.$line;
+    }
+
+    &:enabled:focus,
+    &.p-focus {
+      border-color: v.$accent;
+      box-shadow: none;
+      outline: 2px solid v.$accent;
+      outline-offset: -2px;
+    }
+
+    &:disabled,
+    &.p-disabled {
+      color: v.$muted;
+      opacity: 1;
+      background: v.$surface-2;
+    }
+  }
+
+  .p-dropdown .p-dropdown-label,
+  .p-multiselect .p-multiselect-label {
+    color: v.$ink;
+
+    &.p-placeholder {
+      color: v.$muted-2;
+    }
+  }
+
+  .p-dropdown .p-dropdown-trigger,
+  .p-multiselect .p-multiselect-trigger,
+  .p-dropdown .p-dropdown-clear-icon,
+  .p-multiselect .p-multiselect-clear-icon {
+    color: v.$muted;
+  }
+
+  // ── Pannelli in overlay (montati fuori da .App) ─────────────────────────
+  .p-dropdown-panel,
+  .p-multiselect-panel,
+  .p-password-panel,
+  .p-overlaypanel,
+  .p-menu,
+  .p-tieredmenu {
+    background: v.$surface;
+    border: 1px solid v.$line;
+    border-radius: v.$r-field;
+    color: v.$ink;
+    box-shadow: v.$shadow-sheet;
+
+    .p-dropdown-items,
+    .p-multiselect-items,
+    .p-menu-list {
+      padding: 6px;
+    }
+
+    .p-dropdown-item,
+    .p-multiselect-item,
+    .p-menuitem-link {
+      border-radius: v.$r-icon;
+      color: v.$ink;
+
+      &:hover,
+      &.p-focus {
+        background: v.$surface-2;
+        color: v.$ink;
+      }
+
+      &.p-highlight {
+        background: v.$accent-soft;
+        color: v.$accent;
+      }
+    }
+
+    // Intestazione con il campo di ricerca (dropdown/multiselect filtrabili):
+    // lara la dipinge bianca a parte, non basta il fondo del pannello.
+    .p-dropdown-header,
+    .p-multiselect-header {
+      background: v.$surface;
+      border-bottom: 1px solid v.$line-soft;
+      color: v.$ink;
+    }
+
+    .p-dropdown-item-group,
+    .p-multiselect-item-group {
+      background: v.$surface;
+      color: v.$muted;
+    }
+
+    .p-dropdown-empty-message,
+    .p-multiselect-empty-message {
+      color: v.$muted;
+    }
+  }
+
+  // La freccina dell'overlay panel è disegnata con due pseudo-elementi che
+  // ripetono il fondo: senza questo restano due triangolini bianchi.
+  .p-overlaypanel {
+    .p-overlaypanel-content {
+      color: v.$ink;
+    }
+
+    &:before,
+    &:after {
+      border-bottom-color: v.$surface;
+    }
+
+    &.p-overlaypanel-flipped:before,
+    &.p-overlaypanel-flipped:after {
+      border-top-color: v.$surface;
+    }
+
+    .p-overlaypanel-close {
+      background: v.$accent;
+      color: v.$on-accent;
+    }
+  }
+
+  .p-multiselect-token {
+    background: v.$accent-soft;
+    color: v.$accent;
+    border-radius: v.$r-pill;
+  }
+
+  // ── Bottoni PrimeReact ──────────────────────────────────────────────────
+  .p-button {
+    border-radius: v.$r-field;
+    background: v.$accent;
+    border-color: v.$accent;
+    color: v.$on-accent;
+    font-family: v.$font-ui;
+    font-weight: 700;
+
+    &:enabled:hover,
+    &:enabled:active {
+      background: v.$accent;
+      border-color: v.$accent;
+      color: v.$on-accent;
+    }
+
+    &:focus {
+      box-shadow: none;
+    }
+
+    // `p-button-plain` è la variante che lara colora di grigio scuro fisso:
+    // sul fondo scuro sparirebbe.
+    &.p-button-text,
+    &.p-button-text.p-button-plain {
+      background: transparent;
+      border-color: transparent;
+      color: v.$accent;
+
+      &:enabled:hover {
+        background: v.$accent-soft;
+        border-color: transparent;
+        color: v.$accent;
+      }
+    }
+
+    &.p-button-outlined,
+    &.p-button-outlined.p-button-plain {
+      background: transparent;
+      border-color: v.$accent;
+      color: v.$accent;
+
+      &:enabled:hover {
+        background: v.$accent-soft;
+        border-color: v.$accent;
+        color: v.$accent;
+      }
+    }
+  }
+
+  .p-badge {
+    background: v.$accent;
+    color: v.$on-accent;
+  }
+
+  // ── Selezione ───────────────────────────────────────────────────────────
+  .p-checkbox .p-checkbox-box,
+  .p-radiobutton .p-radiobutton-box {
+    background: v.$surface;
+    border-color: v.$line;
+    color: v.$ink;
+
+    &.p-highlight {
+      background: v.$accent;
+      border-color: v.$accent;
+      color: v.$on-accent;
+    }
+  }
+
+  .p-inputswitch .p-inputswitch-slider {
+    background: v.$track;
+
+    &:before {
+      background: var(--knob);
+    }
+  }
+
+  .p-inputswitch.p-inputswitch-checked .p-inputswitch-slider {
+    background: v.$accent;
+  }
+
+  .p-selectbutton .p-button {
+    background: v.$surface-2;
+    border-color: transparent;
+    color: v.$ink;
+
+    &:not(.p-highlight):not(.p-disabled):hover {
+      background: v.$surface-2;
+      color: v.$ink;
+    }
+
+    &.p-highlight {
+      background: v.$accent;
+      color: v.$on-accent;
+
+      &:hover {
+        background: v.$accent;
+        color: v.$on-accent;
+      }
+    }
+  }
+
+  // ── Calendario ──────────────────────────────────────────────────────────
+  .p-calendar {
+    border-radius: v.$r-field;
+
+    .p-datepicker-trigger {
+      background: v.$accent;
+      border-color: v.$accent;
+      color: v.$on-accent;
+
+      svg {
+        color: v.$on-accent;
+      }
+    }
+
+    .p-inputtext {
+      padding: 0 0.5rem;
+    }
+
+    &:not(.p-calendar-disabled).p-focus > .p-inputtext {
+      box-shadow: none;
+    }
+  }
+
+  // `:not(.p-datepicker-inline)` è la forma che usa lara per il pannello in
+  // overlay: senza ripeterla qui il fondo bianco del tema chiaro vinceva.
+  .p-datepicker,
+  .p-datepicker:not(.p-datepicker-inline) {
+    background: v.$surface;
+    border: 1px solid v.$line;
+    border-radius: v.$r-field;
+    color: v.$ink;
+  }
+
+  // L'ombra la porta solo il pannello che galleggia sopra la pagina: quello in
+  // linea è già dentro una card e con l'ombra sembrerebbe staccato due volte.
+  .p-datepicker:not(.p-datepicker-inline) {
+    box-shadow: v.$shadow-sheet;
+  }
+
+  .p-datepicker,
+  .p-datepicker:not(.p-datepicker-inline) {
+    .p-datepicker-header {
+      background: v.$surface;
+      border-bottom: 1px solid v.$line-soft;
+      color: v.$ink;
+
+      // Lara li aggancia alle classi `.p-datepicker-year` / `.p-datepicker-month`,
+      // non a `button`: mirando all'elemento perdevamo il confronto.
+      .p-datepicker-title .p-datepicker-year,
+      .p-datepicker-title .p-datepicker-month {
+        color: v.$ink;
+
+        &:enabled:hover {
+          color: v.$accent;
+        }
+      }
+
+      .p-datepicker-prev,
+      .p-datepicker-next {
+        color: v.$ink;
+
+        &:enabled:hover {
+          background: v.$surface-2;
+          color: v.$ink;
+        }
+      }
+    }
+
+    table th {
+      color: v.$muted;
+    }
+
+    table td > span {
+      border-radius: v.$r-icon;
+      color: v.$ink;
+
+      &.p-highlight {
+        background: v.$accent;
+        color: v.$on-accent;
+      }
+
+      &.p-disabled {
+        color: v.$muted-2;
+      }
+    }
+
+    table td.p-datepicker-today > span {
+      background: v.$accent-soft;
+      color: v.$accent;
+
+      &.p-highlight {
+        background: v.$accent;
+        color: v.$on-accent;
+      }
+    }
+
+    &:not(.p-disabled) table td span:not(.p-highlight):not(.p-disabled):hover {
+      background: v.$surface-2;
+    }
+
+    // Selettori di mese e anno: stessa lista di ieri, altro markup.
+    .p-monthpicker .p-monthpicker-month,
+    .p-yearpicker .p-yearpicker-year {
+      border-radius: v.$r-icon;
+      color: v.$ink;
+
+      &.p-highlight {
+        background: v.$accent;
+        color: v.$on-accent;
+      }
+    }
+
+    &:not(.p-disabled) {
+      .p-monthpicker .p-monthpicker-month:not(.p-disabled):not(.p-highlight):hover,
+      .p-yearpicker .p-yearpicker-year:not(.p-disabled):not(.p-highlight):hover {
+        background: v.$surface-2;
+      }
+    }
+
+    .p-timepicker {
+      border-top: 1px solid v.$line-soft;
+      color: v.$ink;
+
+      button {
+        color: v.$ink;
+
+        &:enabled:hover {
+          background: v.$surface-2;
+          color: v.$ink;
+        }
+      }
+    }
+
+    // "Oggi" e "Cancella": due bottoni di testo, non due bottoni pieni.
+    .p-datepicker-buttonbar {
+      border-top: 1px solid v.$line-soft;
+
+      .p-button {
+        background: transparent;
+        border-color: transparent;
+        color: v.$accent;
+
+        &:enabled:hover {
+          background: v.$accent-soft;
+          border-color: transparent;
+          color: v.$accent;
+        }
+      }
+    }
+
+    &.p-datepicker-multiple-month .p-datepicker-group {
+      border-left-color: v.$line;
+    }
+  }
+
+  // ── Fuoco ───────────────────────────────────────────────────────────────
+  // Lara segna il fuoco con un alone ciano (#a5f3fc, il suo accento) in 66
+  // punti: in questa app di ciano non c'è niente, e sul fondo scuro quell'alone
+  // è la cosa più chiara della schermata. L'anello del fuoco lo disegna già
+  // App.scss con `:focus-visible` sui token, quindi qui basta togliere il suo —
+  // i selettori ricalcano i suoi perché è l'unico modo di arrivarci sopra.
+  .p-inputtext:enabled:focus,
+  .p-dropdown:not(.p-disabled).p-focus,
+  .p-multiselect:not(.p-disabled).p-focus,
+  .p-calendar:not(.p-calendar-disabled).p-focus > .p-inputtext,
+  .p-selectbutton .p-button:focus,
+  .p-dialog .p-dialog-header .p-dialog-header-icon:focus-visible,
+  .p-datepicker .p-datepicker-header .p-datepicker-prev:focus-visible,
+  .p-datepicker .p-datepicker-header .p-datepicker-next:focus-visible,
+  .p-datepicker table td > span:focus,
+  .p-datepicker .p-timepicker button:focus-visible,
+  .p-datepicker:not(.p-disabled) table td span:not(.p-highlight):not(.p-disabled):focus,
+  .p-datepicker:not(.p-disabled) .p-monthpicker .p-monthpicker-month:not(.p-disabled):focus,
+  .p-datepicker:not(.p-disabled) .p-yearpicker .p-yearpicker-year:not(.p-disabled):focus,
+  .p-multiselect-panel .p-multiselect-header .p-multiselect-close:focus-visible,
+  .p-overlaypanel .p-overlaypanel-close:focus-visible,
+  .p-datatable .p-sortable-column:focus-visible,
+  .p-paginator .p-paginator-element:focus,
+  .p-stepper .p-stepper-header:not(.p-disabled):focus-visible,
+  .p-stepper .p-stepper-header .p-stepper-action:not(.p-disabled):focus-visible {
+    box-shadow: none;
+  }
+
+  // Questi tre non possono restare senza niente: il fuoco ce l'ha l'input
+  // nascosto, e l'outline di `:focus-visible` finirebbe su un elemento che non
+  // si vede. Qui l'anello serve, solo del colore giusto.
+  .p-checkbox:not(.p-disabled):has(.p-checkbox-input:focus-visible)
+    .p-checkbox-box,
+  .p-radiobutton:not(.p-disabled):has(.p-radiobutton-input:focus-visible)
+    .p-radiobutton-box,
+  .p-inputswitch:not(.p-disabled):has(.p-inputswitch-input:focus-visible)
+    .p-inputswitch-slider {
+    box-shadow: 0 0 0 2px v.$accent;
+  }
+
+  // ── Dialog e popup ──────────────────────────────────────────────────────
+  .p-dialog {
+    border: 1px solid v.$line;
+    border-radius: v.$r-card;
+    box-shadow: v.$shadow-sheet;
+    overflow: hidden;
+
+    .p-dialog-header,
+    .p-dialog-content,
+    .p-dialog-footer {
+      background: v.$surface;
+      color: v.$ink;
+    }
+
+    .p-dialog-header {
+      padding: 1.4rem 1.5rem 0.75rem;
+
+      .p-dialog-title {
+        font-weight: 800;
+        font-size: 1.2rem;
+        letter-spacing: -0.02em;
+      }
+    }
+
+    .p-dialog-content {
+      padding: 0.5rem 1.5rem 1rem;
+    }
+
+    .p-dialog-footer {
+      padding: 1rem 1.5rem 1.4rem;
+    }
+
+    .p-dialog-header-icon {
+      color: v.$muted;
+      border-radius: v.$r-pill;
+
+      &:enabled:hover,
+      &:hover {
+        background: v.$surface-2;
+        color: v.$ink;
+      }
+    }
+
+    &.p-confirm-dialog .p-confirm-dialog-message {
+      color: v.$ink;
+    }
+  }
+
+  .p-confirm-popup {
+    background: v.$surface;
+    border: 1px solid v.$line;
+    border-radius: v.$r-field;
+    color: v.$ink;
+
+    .p-confirm-popup-content,
+    .p-confirm-popup-footer {
+      background: v.$surface;
+      color: v.$ink;
+    }
+
+    &:after,
+    &:before {
+      border-bottom-color: v.$surface;
+    }
+
+    &.p-confirm-popup-flipped:after,
+    &.p-confirm-popup-flipped:before {
+      border-top-color: v.$surface;
+    }
+  }
+
+  // ── Tabelle e paginazione ───────────────────────────────────────────────
+  .p-datatable {
+    color: v.$ink;
+
+    .p-datatable-header,
+    .p-datatable-footer {
+      background: v.$surface-2;
+      border-color: v.$line;
+      color: v.$ink;
+    }
+
+    .p-datatable-thead > tr > th {
+      background: v.$surface-2;
+      border-color: v.$line;
+      color: v.$ink;
+    }
+
+    .p-datatable-tbody > tr {
+      background: v.$surface;
+      color: v.$ink;
+
+      > td {
+        border-color: v.$line;
+      }
+
+      &.p-highlight {
+        background: v.$accent-soft;
+        color: v.$accent;
+      }
+    }
+
+    .p-datatable-emptymessage > td {
+      color: v.$muted;
+    }
+  }
+
+  .p-paginator {
+    background: transparent;
+    border: none;
+    color: v.$ink;
+
+    .p-paginator-element {
+      color: v.$ink;
+      border-radius: v.$r-icon;
+
+      &:not(.p-disabled):not(.p-highlight):hover {
+        background: v.$surface-2;
+        color: v.$ink;
+      }
+
+      &.p-highlight {
+        background: v.$accent-soft;
+        color: v.$accent;
+      }
+    }
+  }
+
+  // ── Tab menu (ancora usato dalle schermate non convertite) ──────────────
+  .p-tabmenu .p-tabmenu-nav {
+    background: transparent;
+    border-color: v.$line;
+
+    .p-menuitem-link {
+      background: transparent;
+      border-color: transparent;
+      color: v.$muted;
+      font-family: v.$font-ui;
+    }
+
+    .p-highlight .p-menuitem-link {
+      background: transparent;
+      border-color: v.$accent;
+      color: v.$accent;
+    }
+  }
+
+  // ── Superfici minori ────────────────────────────────────────────────────
+  .p-progress-spinner-circle {
+    stroke: v.$accent;
+    animation: p-progress-spinner-dash 1.5s ease-in-out infinite;
+  }
+
+  .p-virtualscroller {
+    background: transparent;
+    color: v.$ink;
+  }
+
+  .p-scrollpanel .p-scrollpanel-bar {
+    background: v.$line;
+  }
+
+  // Il velo dietro a dialog e sheet: lara lo prende da `--maskbg`, che i token
+  // rimappano su `--overlay`. Lo ripetiamo perché `.p-component-overlay` ha
+  // anche una variante con il colore scritto a mano.
+  .p-component-overlay,
+  .p-dialog-mask.p-component-overlay {
+    background: v.$overlay;
+  }
+}

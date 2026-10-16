@@ -1,0 +1,40 @@
+@use "../../../styles/variables.scss" as v;
+
+.budget-settings-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1rem 0.5rem;
+}
+
+.buttons-footer-dialog {
+  display: flex;
+  // Cambiato da flex-end a stretch per riempire lo spazio
+  justify-content: stretch;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 0;
+  width: 100%; // Fondamentale per occupare tutta la larghezza del footer
+
+  > div {
+    flex: 1;
+  }
+
+  button {
+    // Ora usiamo flex: 1 per forzare entrambi i pulsanti a dividersi lo spazio 50/50
+    flex: 1 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0.75rem 1rem; // Un po' più di padding verticale per un look più moderno
+
+    // Rimuoviamo il min-width fisso per evitare conflitti con lo stretch
+    min-width: 0 !important;
+  }
+
+  // Su mobile non serve cambiare nulla perché flex: 1 gestisce già tutto,
+  // ma possiamo ridurre il gap se lo spazio è pochissimo
+  @media (max-width: v.$mobile) {
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+  }
+}

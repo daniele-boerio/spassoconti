@@ -1,0 +1,189 @@
+@use "../../styles/variables" as v;
+
+.movements {
+  &__header {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  &__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  &__actions {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 8px;
+  }
+
+  &__icon-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+
+    border: 1px solid v.$line;
+    border-radius: v.$r-pill;
+    background: v.$surface;
+    color: v.$muted;
+    cursor: pointer;
+
+    i {
+      font-size: 14px;
+    }
+
+    &:active {
+      transform: scale(0.97);
+      transition: transform v.$dur-press;
+    }
+  }
+
+  &__search {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 16px;
+
+    border: 1px solid v.$line;
+    border-radius: v.$r-pill;
+    background: v.$surface;
+    color: v.$muted-2;
+
+    i {
+      flex: 0 0 auto;
+      font-size: 14px;
+    }
+
+    input {
+      flex: 1;
+      min-width: 0;
+      border: 0;
+      background: transparent;
+      color: v.$ink;
+      font-family: inherit;
+      font-size: v.$fs-field;
+
+      &::placeholder {
+        color: v.$muted-2;
+      }
+
+      &:focus {
+        outline: none;
+      }
+
+      // La X nativa di `type="search"` non segue il tema: la togliamo, il
+      // campo si svuota con "Azzera i filtri" o cancellando.
+      &::-webkit-search-cancel-button {
+        appearance: none;
+      }
+    }
+  }
+
+  // I chip escono dai margini della pagina: scorrono in orizzontale senza far
+  // scorrere il resto dell'intestazione.
+  &__chips {
+    display: flex;
+    gap: 8px;
+    margin: 0 calc(-1 * v.$gutter);
+    padding: 2px v.$gutter 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  &__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+
+    border-radius: 18px;
+    background: v.$surface;
+    box-shadow: v.$shadow-card;
+    border: v.$card-edge;
+  }
+
+  &__balance {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  &__eyebrow {
+    @include v.eyebrow;
+    color: v.$muted;
+  }
+
+  &__balance-value {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  &__totals {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 16px;
+  }
+
+  &__total {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  &__total-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: v.$muted;
+  }
+
+  // I gruppi hanno un respiro maggiore delle card: l'intestazione del giorno
+  // appartiene alla lista che segue, non a quella sopra.
+  &__list {
+    gap: 18px;
+  }
+
+  &__group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  // La card di un gruppo è solo il contenitore delle righe: il padding
+  // verticale lo mettono le righe stesse.
+  &__card {
+    gap: 0;
+    padding: 4px 16px;
+    border-radius: v.$r-inner;
+  }
+}
+
+// ── Desktop ─────────────────────────────────────────────────────────────────
+@media (min-width: v.$bp-desktop) {
+  .movements {
+    // I filtri sono il pannello in colonna: il bottone che apriva il foglio
+    // aprirebbe la stessa cosa una seconda volta.
+    &__icon-button--filters {
+      display: none;
+    }
+
+    // La riga tabellare arriva fino al bordo della card: il respiro glielo
+    // dà il padding della card, non un secondo margine interno.
+    &__card {
+      padding-top: 4px;
+      padding-bottom: 10px;
+    }
+  }
+}

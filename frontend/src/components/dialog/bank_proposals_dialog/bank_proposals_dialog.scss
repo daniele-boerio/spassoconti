@@ -1,0 +1,99 @@
+@use "../../../styles/variables.scss" as v;
+
+.bank-proposals-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+
+  .bank-proposals-subtitle {
+    margin: 0;
+    color: v.$text-muted;
+    font-size: 0.9rem;
+  }
+
+  .form-row {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+
+    &.two-cols {
+      flex-direction: row;
+      gap: 1.25rem;
+
+      > * {
+        flex: 1;
+        min-width: 0;
+      }
+
+      @media screen and (max-width: v.$mobile) {
+        flex-direction: column;
+        gap: 1.1rem;
+      }
+    }
+  }
+
+  .proposal-summary {
+    border: 1px solid v.$border-color;
+    border-left: 4px solid v.$text-muted;
+    border-radius: v.$radius-md;
+    padding: 0.85rem 1rem;
+    background: v.$surface-hover;
+
+    &.uscita {
+      border-left-color: v.$red;
+    }
+    &.entrata {
+      border-left-color: v.$green;
+    }
+
+    &__main {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    &__desc {
+      font-weight: 600;
+      color: v.$text-main;
+    }
+
+    &__amount {
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    &.uscita .proposal-summary__amount {
+      color: v.$red;
+    }
+    &.entrata .proposal-summary__amount {
+      color: v.$green;
+    }
+
+    &__sub {
+      margin-top: 0.3rem;
+      font-size: 0.8rem;
+      color: v.$text-muted;
+    }
+  }
+
+  .bank-proposals-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+
+    // Su telefono restano affiancati, dividendo la larghezza
+    @media screen and (max-width: v.$mobile) {
+      .div-button {
+        flex: 1;
+        min-width: 0;
+
+        button {
+          width: 100%;
+        }
+      }
+    }
+  }
+}

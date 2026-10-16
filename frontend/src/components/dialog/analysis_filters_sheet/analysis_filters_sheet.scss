@@ -1,0 +1,37 @@
+@use "../../../styles/variables" as v;
+
+.analysis-filters {
+  &__section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  &__label {
+    @include v.eyebrow;
+    color: v.$muted;
+  }
+
+  &__empty {
+    margin: 0;
+    font-size: 13px;
+    color: v.$muted;
+  }
+  &__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  // Dodici mesi in griglia: in fila si leggerebbero solo scorrendo.
+  &__months {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+
+  &__month {
+    justify-content: center;
+    text-transform: capitalize;
+  }
+}

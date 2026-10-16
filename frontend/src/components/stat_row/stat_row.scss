@@ -1,0 +1,69 @@
+@use "../../styles/variables" as v;
+
+.stat-row {
+  display: grid;
+  // Una colonna per metrica, larghe uguali: due o tre cambia solo il conto.
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+
+  border-radius: v.$r-card;
+  background: v.$surface;
+  box-shadow: v.$shadow-card;
+  border: v.$card-edge;
+
+  &__cell {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 14px 12px;
+
+    & + & {
+      border-left: 1px solid v.$line-soft;
+    }
+
+    // La colonna che porta al suo elenco. Il `border: 0` qui pesa meno della
+    // riga qui sopra, quindi la linea che separa le colonne resta.
+    &--tappable {
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+
+      &:active {
+        transform: scale(0.98);
+        transition: transform v.$dur-press;
+      }
+    }
+  }
+
+  &__label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+
+    @include v.eyebrow;
+    color: v.$muted;
+
+    // Il gallone è l'unico segno che la colonna si tocca: la card non cambia
+    // forma per non pesare più dell'hero che le sta sopra.
+    i {
+      font-size: 9px;
+    }
+  }
+
+  &__value {
+    font-size: 16px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+
+    &--positive {
+      color: v.$positive;
+    }
+
+    &--negative {
+      color: v.$negative;
+    }
+  }
+}

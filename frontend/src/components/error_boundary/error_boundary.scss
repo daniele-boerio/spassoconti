@@ -1,0 +1,132 @@
+@use "../../styles/variables" as v;
+
+// Schermata a tutta pagina: quando compare, è l'unica cosa rimasta in piedi.
+// Niente `Page`/`Card` di libreria — se a rompersi è stato il caricamento di un
+// chunk, meno dipendenze ha questa schermata e meglio è.
+.error-boundary {
+  min-height: 100dvh;
+  box-sizing: border-box;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+
+  padding: 32px 26px calc(32px + env(safe-area-inset-bottom));
+  background: v.$bg;
+  color: v.$ink;
+
+  &__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 20px;
+    background: v.$accent-soft;
+    color: v.$accent;
+
+    i {
+      font-size: 22px;
+    }
+  }
+
+  &__text {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  &__title {
+    margin: 0;
+    font-family: v.$font-display;
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  &__message {
+    margin: 0;
+    max-width: 32ch;
+    font-size: 14px;
+    line-height: 1.5;
+    color: v.$muted;
+  }
+
+  // Secondario, sotto al "Riprova": porta fuori lo stack da un telefono
+  // dove la console non si apre.
+  &__copy {
+    appearance: none;
+    border: 0;
+    cursor: pointer;
+
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+
+    min-height: v.$tap-target;
+    padding: 0 16px;
+    border-radius: v.$r-field;
+
+    background: transparent;
+    color: v.$muted;
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+
+    i {
+      font-size: 12px;
+    }
+  }
+
+  // Ripiego quando gli appunti non sono disponibili.
+  &__manual {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-width: 34rem;
+  }
+
+  &__manual-hint {
+    margin: 0;
+    font-size: 12.5px;
+    color: v.$muted;
+  }
+
+  &__report {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid v.$line;
+    border-radius: v.$r-field;
+
+    background: v.$surface;
+    color: v.$ink;
+    // Monospazio: uno stack a capo dove capita non si legge.
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    // Sotto i 16px Safari ingrandisce la pagina quando il campo prende il
+    // fuoco: qui il fuoco arriva davvero, perché il testo si seleziona.
+    font-size: 16px;
+    line-height: 1.45;
+    text-align: left;
+    resize: vertical;
+  }
+
+  &__action {
+    appearance: none;
+    border: 0;
+    cursor: pointer;
+
+    min-height: 50px;
+    padding: 0 28px;
+    border-radius: v.$r-field;
+
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+
+    background: v.$accent;
+    color: v.$on-accent;
+  }
+}

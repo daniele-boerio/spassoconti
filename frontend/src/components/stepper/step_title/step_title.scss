@@ -1,0 +1,39 @@
+@use "../../../styles/variables" as v;
+
+.step-title-container {
+  display: flex;
+  flex-direction: column;
+  // Usiamo una proporzione basata sul padding standard o 1rem
+  gap: 1rem;
+  margin-bottom: 2rem; // Aggiunto per distanziare il titolo dal contenuto del pannello
+
+  .title {
+    font-size: 2rem;
+    font-weight: 500;
+    color: v.$text-main;
+    font-family: v.$font-main;
+    letter-spacing: -0.96px;
+    line-height: 1.1;
+  }
+
+  .subtitle {
+    // Usato 1rem come equivalente di md, oppure v.$text-muted per gerarchia
+    font-size: 1rem;
+    font-weight: normal;
+    color: v.$text-muted; // Il sottotitolo solitamente è più tenue
+    font-family: v.$font-main;
+    line-height: 1.25;
+    letter-spacing: -0.48px;
+    white-space: pre-line; // Mantiene i ritorni a capo se presenti nella stringa
+  }
+
+  // Ottimizzazione per mobile
+  @media (max-width: v.$mobile) {
+    .title {
+      font-size: 1.5rem; // Testo leggermente più piccolo su smartphone
+    }
+    .subtitle {
+      font-size: 0.9rem;
+    }
+  }
+}

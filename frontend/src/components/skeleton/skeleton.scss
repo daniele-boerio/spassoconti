@@ -1,0 +1,55 @@
+@use "../../styles/variables" as v;
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  &__avatar {
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
+    border-radius: v.$r-pill;
+    background: v.$surface-2;
+  }
+
+  &__text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  &__bar {
+    flex: 0 0 auto;
+    border-radius: v.$r-pill;
+    background: v.$surface-2;
+
+    &--soft {
+      background: v.$line-soft;
+    }
+  }
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
