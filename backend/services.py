@@ -1,7 +1,9 @@
 import base64
+import functools
 import io
 import os
 import re
+import threading
 import time
 import requests
 import yfinance as yf
@@ -21,6 +23,81 @@ from typing import Optional
 # Configura il logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+class _ContaErroriDelThread(logging.Handler):
+    """Conta i log ERROR emessi dal thread del job (e solo da quello).
+
+    I job tengono già i loro `try/except` per riga e utente, e un errore lì
+    finisce in `logger.exception` senza risalire: è il motivo per cui un job
+    "finito" può comunque non aver fatto il suo lavoro. Il filtro sul thread
+    evita di contare gli errori delle richieste HTTP servite nel frattempo.
+    """
+
+    def __init__(self):
+        super().__init__(level=logging.ERROR)
+        self.thread = threading.get_ident()
+        self.errori = 0
+
+    def emit(self, record):
+        if record.thread == self.thread:
+            self.errori += 1
+
+
+def _registra_job(nome, avvio, esito, errori, problemi, messaggio):
+    db = SessionLocal()
+    try:
+        db.merge(
+            models.JobRun(
+                nome=nome,
+                ultimo_avvio=avvio,
+                ultima_fine=datetime.now(timezone.utc),
+                esito=esito,
+                errori=errori,
+                problemi=problemi,
+                messaggio=messaggio,
+            )
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Impossibile registrare l'esito del job %s", nome)
+    finally:
+        db.close()
+
+
+def traccia_job(nome: str):
+    """Registra in `job_runs` l'esito di ogni giro del job (vedi models.JobRun).
+
+    Esito "fallito" se il job solleva, "errori" se finisce ma ha loggato errori,
+    "ok" altrimenti. Se il job ritorna un intero, è il numero di problemi trovati
+    (per la verifica saldi: i conti sfasati). Non cambia il valore di ritorno.
+    """
+
+    def decoratore(fn):
+        @functools.wraps(fn)
+        def job(*args, **kwargs):
+            avvio = datetime.now(timezone.utc)
+            contatore = _ContaErroriDelThread()
+            logger.addHandler(contatore)
+            esito, risultato, messaggio = "ok", None, None
+            try:
+                risultato = fn(*args, **kwargs)
+            except Exception as exc:
+                logger.exception("Job %s fallito", nome)
+                esito, messaggio = "fallito", type(exc).__name__
+            finally:
+                logger.removeHandler(contatore)
+
+            if esito == "ok" and contatore.errori:
+                esito = "errori"
+            problemi = risultato if isinstance(risultato, int) else None
+            _registra_job(nome, avvio, esito, contatore.errori, problemi, messaggio)
+            return risultato
+
+        return job
+
+    return decoratore
 
 
 def importo_effettivo():
@@ -115,6 +192,7 @@ def get_live_price(ticker_symbol: str, isin_code: str):
         return None
 
 
+@traccia_job("aggiornamento_prezzi")
 def task_aggiornamento_prezzi():
     """
     Questo task aggiorna solo il campo 'prezzo_attuale' nell'anagrafica Investimento.
@@ -523,15 +601,24 @@ def verifica_saldi(db: Session, user_id: int) -> list[dict]:
     return discrepanze
 
 
+@traccia_job("verifica_saldi")
 def task_verifica_saldi():
-    """Controllo notturno: fotografa i conti nuovi e segnala i saldi sfasati."""
+    """Controllo notturno: fotografa i conti nuovi e segnala i saldi sfasati.
+
+    Ritorna quanti conti sono sfasati: `traccia_job` lo salva in `job_runs` e
+    `GET /api/health/jobs` risponde 503 finché non tornano a zero (il monitor
+    del mattino manda la mail). Lo sfasamento è un ERROR, non un warning: vuol
+    dire soldi che non tornano.
+    """
     db = SessionLocal()
+    sfasati = 0
 
     try:
         for (user_id,) in db.query(models.User.id).all():
             try:
                 for riga in verifica_saldi(db, user_id):
-                    logger.warning(
+                    sfasati += 1
+                    logger.error(
                         "Saldo fuori sincrono: utente %s conto %s, saldo %s, atteso %s",
                         user_id,
                         riga["conto_id"],
@@ -544,6 +631,7 @@ def task_verifica_saldi():
                 logger.exception("Verifica saldi fallita per l'utente %s", user_id)
     finally:
         db.close()
+    return sfasati
 
 
 def saldo_dopo_transazione(
@@ -672,6 +760,7 @@ def stima_fine_debito(db: Session, debito: models.Debito) -> Optional[str]:
     return f"{fine.year}-{fine.month:02d}"
 
 
+@traccia_job("snapshot_patrimonio")
 def task_snapshot_patrimonio():
     """Fotografa il patrimonio di ogni utente per il mese corrente.
 
@@ -737,6 +826,7 @@ def task_snapshot_patrimonio():
 MAX_OCCORRENZE_RECUPERATE = 400
 
 
+@traccia_job("transazioni_ricorrenti")
 def task_transazioni_ricorrenti():
     """Registra tutte le occorrenze scadute, anche quelle arretrate.
 
@@ -797,6 +887,7 @@ def task_transazioni_ricorrenti():
         db.close()
 
 
+@traccia_job("ricarica_automatica")
 def task_ricarica_automatica_conti():
     db = SessionLocal()
     today = date.today()
@@ -1288,6 +1379,7 @@ def import_bank_transaction_proposal(db, proposal, import_data, current_user_id)
     return new_trans
 
 
+@traccia_job("sync_bank_connectors")
 def task_sync_bank_connectors():
     db = SessionLocal()
     try:

@@ -522,3 +522,27 @@ Index(
     Transazione.idempotency_key,
     unique=True,
 )
+
+
+class JobRun(Base):
+    """L'ultimo giro di ogni job notturno, per sapere se qualcosa si è fermato.
+
+    I job girano nello scheduler, di notte, e i loro errori finiscono solo nei
+    log: senza questa riga un job fallito (o mai partito, perché il container era
+    in deploy alle 03:00) resterebbe invisibile. La scrive `services.traccia_job`
+    a ogni esecuzione; la legge `GET /api/health/jobs`, che il monitor su GitHub
+    controlla ogni mattina.
+    """
+
+    __tablename__ = "job_runs"
+
+    nome = Column(String, primary_key=True)
+    ultimo_avvio = Column(DateTime(timezone=True), nullable=False)
+    ultima_fine = Column(DateTime(timezone=True), nullable=True)
+    # "ok" | "errori" (finito, ma ha loggato errori) | "fallito" (eccezione)
+    esito = Column(String, nullable=False)
+    errori = Column(Integer, nullable=False, default=0)
+    # Quello che il job ha trovato da segnalare: per la verifica saldi, i conti
+    # sfasati. None per i job che non contano niente.
+    problemi = Column(Integer, nullable=True)
+    messaggio = Column(String, nullable=True)

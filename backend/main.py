@@ -2,16 +2,19 @@ import os
 import logging
 import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+from apscheduler.events import EVENT_JOB_MISSED
 from apscheduler.schedulers.background import BackgroundScheduler
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+import models
 from database import get_db
 from rate_limit import limiter
 from services import (
@@ -56,7 +59,19 @@ logger = logging.getLogger(__name__)
 # non corrompe.
 RUN_SCHEDULER = os.getenv("RUN_SCHEDULER", "true").lower() in ("1", "true", "yes")
 
-scheduler = BackgroundScheduler()
+# misfire_grace_time: con il default (1 s) un job che cade mentre il container è
+# in deploy o riavvio viene saltato senza dirlo a nessuno; così parte appena lo
+# scheduler riprende, entro un'ora. coalesce: se ne ha persi più d'uno, uno solo.
+scheduler = BackgroundScheduler(
+    job_defaults={"misfire_grace_time": 3600, "coalesce": True}
+)
+
+
+def _job_saltato(event):
+    logger.error("Job %s saltato (scheduler fermo all'orario previsto)", event.job_id)
+
+
+scheduler.add_listener(_job_saltato, EVENT_JOB_MISSED)
 scheduler.add_job(task_aggiornamento_prezzi, "cron", hour=2, minute=0)
 scheduler.add_job(task_transazioni_ricorrenti, "cron", hour=3, minute=0)
 # Ogni notte riscrive la foto del mese in corso: quella che resta a fine mese
@@ -79,8 +94,9 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("Scheduler disabilitato su questo processo (RUN_SCHEDULER=false)")
     yield
-    # Shutdown
-    if RUN_SCHEDULER and scheduler.running:
+    # Shutdown: si ferma ciò che sta girando, senza ricontrollare il flag (che
+    # nel frattempo può essere cambiato, es. nei test).
+    if scheduler.running:
         scheduler.shutdown(wait=False)
 
 
@@ -191,6 +207,61 @@ def health(db: Session = Depends(get_db)):
             status_code=503, content={"status": "error", "database": "unreachable"}
         )
     return {"status": "ok", "database": "ok"}
+
+
+# Ogni quanto deve aver girato ciascun job (con margine sull'orario del cron).
+# Un job mai partito da quando esiste `job_runs` è "in attesa", non un guasto.
+FRESCHEZZA_JOB = {
+    "snapshot_patrimonio": timedelta(hours=26),
+    "aggiornamento_prezzi": timedelta(hours=26),
+    "transazioni_ricorrenti": timedelta(hours=26),
+    "ricarica_automatica": timedelta(hours=26),
+    "verifica_saldi": timedelta(hours=26),
+    "sync_bank_connectors": timedelta(hours=7),
+}
+
+
+def _utc(dt: datetime) -> datetime:
+    # SQLite (test) restituisce datetime senza fuso: sono comunque UTC.
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+# Lo stato dei job notturni, separato da /health: quello è il healthcheck del
+# container, e un saldo sfasato non deve far ritenere "unhealthy" (e quindi
+# riavviare o bloccare un deploy) un'app che funziona. Questo lo controlla il
+# monitor su GitHub ogni mattina e manda la mail se risponde 503.
+# Pubblico ma senza dati: solo nomi dei job, esiti e conteggi.
+@api.get("/health/jobs", include_in_schema=False)
+def health_jobs(db: Session = Depends(get_db)):
+    if not RUN_SCHEDULER:
+        return {"status": "ok", "scheduler": "disabled", "jobs": {}}
+
+    adesso = datetime.now(timezone.utc)
+    righe = {r.nome: r for r in db.query(models.JobRun).all()}
+    jobs, problemi = {}, []
+    for nome, freschezza in FRESCHEZZA_JOB.items():
+        riga = righe.get(nome)
+        if riga is None:
+            jobs[nome] = {"esito": "in_attesa"}
+            continue
+        stato = {
+            "esito": riga.esito,
+            "ultimo_avvio": _utc(riga.ultimo_avvio).isoformat(),
+            "errori": riga.errori,
+        }
+        if riga.problemi is not None:
+            stato["problemi"] = riga.problemi
+        if riga.esito != "ok":
+            problemi.append(f"{nome}: {riga.esito}")
+        if adesso - _utc(riga.ultimo_avvio) > freschezza:
+            stato["in_ritardo"] = True
+            problemi.append(f"{nome}: in ritardo")
+        if riga.problemi:
+            problemi.append(f"{nome}: {riga.problemi} da controllare")
+        jobs[nome] = stato
+
+    corpo = {"status": "error" if problemi else "ok", "problemi": problemi, "jobs": jobs}
+    return JSONResponse(status_code=503 if problemi else 200, content=corpo)
 
 
 app.include_router(api)

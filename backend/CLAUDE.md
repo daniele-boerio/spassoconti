@@ -94,6 +94,14 @@ def create_xxx(
 - Jobs that write money (recurrences, auto top-up) re-select each row with
   `.with_for_update(skip_locked=True)` and re-check it is still due before acting,
   then commit per row: two scheduler processes cannot double-execute.
+- Every scheduler task is decorated with `@traccia_job("<nome>")` (services.py): it
+  records each run in `job_runs` (esito ok/errori/fallito, counting ERROR logs of
+  the job's thread; an `int` return value is stored as `problemi`). `GET
+  /api/health/jobs` turns that into 503 when a job failed, is late (`FRESCHEZZA_JOB`
+  in main.py) or `verifica_saldi` found mismatches; `.github/workflows/jobs.yml`
+  checks it every morning and GitHub emails on failure. A new job needs both the
+  decorator and an entry in `FRESCHEZZA_JOB`. Keep `/api/health` (the container
+  healthcheck) DB-only: job problems must not mark the container unhealthy.
 - Recurrences are executed with their **due date**, catching up every missed
   occurrence; they stop at `data_fine` / `rate_rimanenti` / when the linked debt is
   paid off. `importo_variabile` ones are never auto-executed.

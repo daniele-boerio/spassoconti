@@ -1,0 +1,44 @@
+# Controllo mattutino dei job notturni di SpassoConti.
+#
+# I job (prezzi 02:00, ricorrenze 03:00, ricariche 04:00, verifica saldi 04:30
+# UTC) girano nello scheduler del backend e i loro errori finiscono solo nei log.
+# /api/health/jobs risponde 503 se uno è fallito, ha loggato errori, è in ritardo
+# o se la verifica saldi ha trovato conti sfasati: il run diventa rosso e GitHub
+# manda la mail. Una volta al giorno, dopo i job, così un problema che resta
+# aperto (un saldo da correggere) arriva come una mail al giorno, non ogni 10 min.
+#
+# Per sapere cosa non va: il corpo della risposta è nel log del run, e i dettagli
+# (conto, importo) nei log del backend su Coolify.
+name: Jobs notturni
+
+on:
+  schedule:
+    - cron: "15 5 * * *"
+  workflow_dispatch:
+
+jobs:
+  jobs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: GET /api/health/jobs
+        run: |
+          url="https://conti.spassocasa.it/api/health/jobs"
+          for attempt in 1 2 3; do
+            body=$(curl -s --max-time 15 -w '\n%{http_code}' "$url" || true)
+            code=$(echo "$body" | tail -n1)
+            json=$(echo "$body" | head -n -1)
+            if [ "$code" = "200" ]; then
+              echo "OK: $json"
+              exit 0
+            fi
+            if [ "$code" = "503" ]; then
+              # Risposta vera dell'app: un problema dei job, inutile riprovare.
+              echo "::error::Job notturni da controllare: $json"
+              exit 1
+            fi
+            echo "::warning::tentativo $attempt: HTTP $code"
+            [ "$attempt" -lt 3 ] && sleep 30
+          done
+          echo "::error::/api/health/jobs non risponde (ultimo: HTTP $code)"
+          exit 1
