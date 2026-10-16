@@ -6,6 +6,20 @@ from database import get_db
 from auth import get_current_user_id
 from models import Transazione, Categoria, Sottocategoria
 from services import importo_effettivo
+from datetime import date
+
+
+# Intervalli di date e non extract(): `extract("year", data) == year` non può usare
+# l'indice su (user_id, data) e scorre tutti i movimenti dell'utente; un confronto
+# su un intervallo sì. Stesso risultato, la fine è esclusa.
+def nell_anno(year: int):
+    return (Transazione.data >= date(year, 1, 1), Transazione.data < date(year + 1, 1, 1))
+
+
+def nel_mese(year: int, month: int):
+    inizio = date(year, month, 1)
+    fine = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+    return (Transazione.data >= inizio, Transazione.data < fine)
 
 router = APIRouter(prefix="/statistics", tags=["Statistics"])
 
@@ -22,7 +36,7 @@ def get_calculated_amount():
 
 @router.get("/yearDetails")
 def get_year_details_statistics(
-    year: int = Query(..., description="L'anno di riferimento"),
+    year: int = Query(..., ge=1900, le=2200, description="L'anno di riferimento"),
     categoria_id: Optional[int] = Query(None, description="Filtra per categoria padre"),
     sottocategoria_id: Optional[List[int]] = Query(
         None, description="Filtra per sottocategoria (ripetibile)"
@@ -51,7 +65,7 @@ def get_year_details_statistics(
         .filter(
             Transazione.user_id == current_user_id,
             Transazione.deleted_at.is_(None),
-            extract("year", Transazione.data) == year,
+            *nell_anno(year),
             Transazione.tipo != "RIMBORSO",
             # Gli accantonamenti hanno un totale separato: niente card per categoria
             Transazione.tipo != "ACCANTONAMENTO",
@@ -78,7 +92,7 @@ def get_year_details_statistics(
     ).filter(
         Transazione.user_id == current_user_id,
         Transazione.deleted_at.is_(None),
-        extract("year", Transazione.data) == year,
+        *nell_anno(year),
         Transazione.tipo != "RIMBORSO",  # Escludiamo i rimborsi dal conteggio
     )
     if categoria_id:
@@ -127,8 +141,8 @@ def get_year_details_statistics(
 
 @router.get("/monthDetails")
 def get_month_details_statistics(
-    year: int = Query(..., description="L'anno di riferimento"),
-    month: int = Query(..., description="Il mese di riferimento (1-12)"),
+    year: int = Query(..., ge=1900, le=2200, description="L'anno di riferimento"),
+    month: int = Query(..., ge=1, le=12, description="Il mese di riferimento (1-12)"),
     categoria_id: Optional[int] = Query(None, description="Filtra per categoria padre"),
     sottocategoria_id: Optional[List[int]] = Query(
         None, description="Filtra per sottocategoria (ripetibile)"
@@ -151,8 +165,7 @@ def get_month_details_statistics(
         .filter(
             Transazione.user_id == current_user_id,
             Transazione.deleted_at.is_(None),
-            extract("year", Transazione.data) == year,
-            extract("month", Transazione.data) == month,
+            *nel_mese(year, month),
             Transazione.tipo != "RIMBORSO",  # Escludiamo i rimborsi dal conteggio
             # Gli accantonamenti hanno un totale separato: niente card per categoria
             Transazione.tipo != "ACCANTONAMENTO",
@@ -228,8 +241,7 @@ def get_month_details_statistics(
     ).filter(
         Transazione.user_id == current_user_id,
         Transazione.deleted_at.is_(None),
-        extract("year", Transazione.data) == year,
-        extract("month", Transazione.data) == month,
+        *nel_mese(year, month),
         Transazione.tipo != "RIMBORSO",  # Escludiamo i rimborsi dal conteggio
     )
     if categoria_id:

@@ -126,6 +126,34 @@ def test_job_fallito_o_in_ritardo_fa_rispondere_503(api):
     assert "ricarica_automatica: fallito" in problemi
 
 
+def test_pulizia_toglie_solo_i_refresh_token_scaduti_da_tempo(api):
+    api.registra("mario")
+    db = api.session_factory()
+    user = db.query(models.User).filter(models.User.username == "mario").one()
+    adesso = datetime.now(timezone.utc).replace(tzinfo=None)
+    for giorni, hash_ in ((-30, "a" * 64), (-2, "b" * 64), (30, "c" * 64)):
+        db.add(
+            models.RefreshToken(
+                user_id=user.id,
+                token_hash=hash_,
+                family_id="f" * 43,
+                expires_at=adesso + timedelta(days=giorni),
+            )
+        )
+    db.commit()
+    db.close()
+
+    services.task_pulizia_refresh_token()
+
+    db = api.session_factory()
+    rimasti = {t.token_hash[0] for t in db.query(models.RefreshToken).all()}
+    db.close()
+    # Il vecchio sparisce; quello scaduto da poco e quello valido restano
+    # (più quello emesso dalla registrazione)
+    assert "a" not in rimasti and {"b", "c"} <= rimasti
+    assert _riga(api, "pulizia_refresh_token").esito == "ok"
+
+
 def test_scheduler_spento_non_segnala_niente(api, monkeypatch):
     monkeypatch.setattr(main, "RUN_SCHEDULER", False)
 

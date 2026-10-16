@@ -761,6 +761,33 @@ def stima_fine_debito(db: Session, debito: models.Debito) -> Optional[str]:
     return f"{fine.year}-{fine.month:02d}"
 
 
+
+@traccia_job("pulizia_refresh_token")
+def task_pulizia_refresh_token():
+    """Cancella i refresh token scaduti da più di una settimana.
+
+    Ogni login e ogni rinnovo ne aggiungono uno, e nessuno li toglieva: la
+    tabella cresceva per sempre. Finché un token è valido va tenuto anche se
+    già usato o revocato (la reuse detection lo deve riconoscere); scaduto da
+    giorni non serve più a niente. Ritorna None: il numero cancellato non è un
+    "problema" per /api/health/jobs.
+    """
+    db = SessionLocal()
+    try:
+        soglia = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
+        cancellati = (
+            db.query(models.RefreshToken)
+            .filter(models.RefreshToken.expires_at < soglia)
+            .delete(synchronize_session=False)
+        )
+        db.commit()
+        logger.info("Pulizia refresh token: %s righe cancellate", cancellati)
+    except Exception:
+        db.rollback()
+        logger.exception("Pulizia dei refresh token fallita")
+    finally:
+        db.close()
+
 @traccia_job("snapshot_patrimonio")
 def task_snapshot_patrimonio():
     """Fotografa il patrimonio di ogni utente per il mese corrente.

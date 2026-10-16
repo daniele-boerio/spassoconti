@@ -522,6 +522,23 @@ Index(
     Transazione.idempotency_key,
     unique=True,
 )
+# Liste, export e statistiche filtrano sempre deleted_at IS NULL: l'indice
+# parziale contiene solo i movimenti vivi, ed è quello che il planner sceglie.
+Index(
+    "ix_transazioni_attive_user_data",
+    Transazione.user_id,
+    Transazione.data,
+    postgresql_where=Transazione.deleted_at.is_(None),
+)
+# Filtri e raggruppamenti per categoria/tag (statistiche, grafici, Movimenti), e
+# il SET NULL quando si cancella una categoria o un tag.
+Index("ix_transazioni_user_categoria", Transazione.user_id, Transazione.categoria_id)
+Index("ix_transazioni_user_tag", Transazione.user_id, Transazione.tag_id)
+# FK senza indice: senza, cancellare un conto scorre queste tabelle intere.
+Index("ix_ricorrenze_conto_id", Ricorrenza.conto_id)
+Index("ix_bank_proposals_conto_id", BankTransactionProposal.conto_id)
+# La pulizia notturna dei refresh token scaduti (task_pulizia_refresh_token).
+Index("ix_refresh_tokens_expires_at", RefreshToken.expires_at)
 
 
 class JobRun(Base):

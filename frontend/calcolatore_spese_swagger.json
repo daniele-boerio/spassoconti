@@ -3785,6 +3785,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2200,
+              "minimum": 1900,
               "description": "L'anno di riferimento",
               "title": "Year"
             },
@@ -3889,6 +3891,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2200,
+              "minimum": 1900,
               "description": "L'anno di riferimento",
               "title": "Year"
             },
@@ -3900,6 +3904,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 12,
+              "minimum": 1,
               "description": "Il mese di riferimento (1-12)",
               "title": "Month"
             },

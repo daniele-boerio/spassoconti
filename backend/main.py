@@ -24,6 +24,7 @@ from services import (
     task_ricarica_automatica_conti,
     task_sync_bank_connectors,
     task_verifica_saldi,
+    task_pulizia_refresh_token,
 )
 from routers import (
     auth,
@@ -80,6 +81,8 @@ scheduler.add_job(task_snapshot_patrimonio, "cron", hour=1, minute=30)
 scheduler.add_job(task_ricarica_automatica_conti, "cron", hour=4, minute=0)
 # Dopo ricorrenze e ricariche: controlla che ogni saldo torni con i movimenti.
 scheduler.add_job(task_verifica_saldi, "cron", hour=4, minute=30)
+# I refresh token scaduti da più di una settimana: nessuno li toglieva.
+scheduler.add_job(task_pulizia_refresh_token, "cron", hour=5, minute=0)
 # Ogni 6 ore (4 volte/giorno): le API AIS (PSD2) limitano gli accessi non
 # presidiati, quindi una sync oraria genera 429 "Too Many Requests".
 scheduler.add_job(task_sync_bank_connectors, "cron", hour="*/6")
@@ -256,6 +259,7 @@ FRESCHEZZA_JOB = {
     "transazioni_ricorrenti": timedelta(hours=26),
     "ricarica_automatica": timedelta(hours=26),
     "verifica_saldi": timedelta(hours=26),
+    "pulizia_refresh_token": timedelta(hours=26),
     "sync_bank_connectors": timedelta(hours=7),
 }
 
