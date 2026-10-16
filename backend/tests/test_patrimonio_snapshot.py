@@ -50,7 +50,7 @@ def client(monkeypatch):
     # Il task apre la sessione da sé: gliela facciamo aprire su questo DB.
     monkeypatch.setattr(services, "SessionLocal", TestingSessionLocal)
 
-    with TestClient(app) as c:
+    with TestClient(app, base_url="http://testserver/api") as c:
         c.session_factory = TestingSessionLocal
         yield c
 

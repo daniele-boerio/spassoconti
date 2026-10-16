@@ -1,0 +1,10 @@
+# Le regole di ciascun lato stanno in backend/.gitignore e frontend/.gitignore.
+# Qui solo ciò che vive alla radice.
+
+# Permessi locali di Claude Code (per macchina, non condivisi)
+.claude/settings.local.json
+
+.env
+.DS_Store
+.vscode/
+.idea/

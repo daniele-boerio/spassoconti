@@ -50,7 +50,7 @@ def client(monkeypatch):
 
     # raise_server_exceptions=False: vogliamo ispezionare la RISPOSTA d'errore,
     # non far ri-sollevare l'eccezione dal TestClient.
-    with TestClient(app, raise_server_exceptions=False) as c:
+    with TestClient(app, base_url="http://testserver/api", raise_server_exceptions=False) as c:
         yield c
 
     app.dependency_overrides.clear()

@@ -2,9 +2,12 @@ import axios from "axios";
 import { toApiError } from "./api_error";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-  // Indispensabile: il refresh token vive in un cookie httpOnly, e senza questo
-  // flag axios non lo allega alle richieste cross-origin verso il BE.
+  // Il BE è sullo stesso origin, sotto /api: in produzione lo gira nginx, in
+  // sviluppo il proxy di Vite (vite.config.js).
+  baseURL: "/api",
+  // Il refresh token vive in un cookie httpOnly. Sullo stesso origin il browser
+  // lo allega comunque; il flag resta perché non costa nulla e regge anche un BE
+  // su un altro origin.
   withCredentials: true,
 });
 

@@ -5,7 +5,9 @@ Alembic migrations, JWT bearer auth, APScheduler background jobs.
 
 ## Layout
 
-- `main.py` — app, CORS, router registration, APScheduler cron jobs.
+- `main.py` — app, router registration (all under `API_PREFIX = "/api"`: nginx in the
+  frontend container forwards `/api/*` unchanged), `GET /api/health` (checks the DB;
+  the container healthcheck), APScheduler cron jobs.
 - `routers/<dominio>.py` — one `APIRouter(prefix="/<dominio>", tags=["<Dominio>"])`
   per domain; the HTTP layer (validate → orchestrate → respond).
 - `schemas/<dominio>.py` — Pydantic v2 models: `…Base`, `…Create`, `…Update`,
@@ -111,7 +113,7 @@ def create_xxx(
 ## Don't
 
 - `pytest` **is** wired up now (`pytest.ini` + `tests/`, in-memory SQLite via
-  `tests/conftest.py`); run it after BE changes (CI runs it too: `.github/workflows/ci.yml`). Still absent:
+  `tests/conftest.py`); run it after BE changes (CI runs it too: `.github/workflows/backend.yml` at the repo root). Still absent:
   `black`/`ruff` and pre-commit —
   don't claim those exist; add the dependency explicitly if you introduce them.
 - Don't rename domains or restructure modules without calling it out — the FE depends

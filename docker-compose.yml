@@ -1,0 +1,74 @@
+services:
+  # ── Frontend (Nginx + build React) ──
+  # È l'unico servizio con un dominio pubblico (conti.spassocasa.it): Traefik/Coolify
+  # manda qui il traffico, e nginx gira al backend tutto ciò che inizia per /api.
+  frontend:
+    build: ./frontend
+    environment:
+      - SERVICE_FQDN_FRONTEND
+    depends_on:
+      - backend
+    healthcheck:
+      # 127.0.0.1 e non localhost: nginx.conf fa solo `listen 80` (IPv4), mentre dentro
+      # il container localhost risolve prima su ::1 e busybox wget non ripiega su IPv4.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:80"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Backend (FastAPI) ──
+  # Nessun dominio pubblico: ci parla solo nginx, via rete Docker interna.
+  # Il Postgres NON è qui: è una risorsa separata (Coolify, SpassoConto-DB), e le
+  # DB_* vanno impostate nelle Environment Variables. DB_HOST è il nome INTERNO del
+  # container del DB, non l'IP dell'host: la porta pubblica del DB è chiusa.
+  # In locale c'è docker-compose.dev.yml.
+  backend:
+    build: ./backend
+    environment:
+      # I default (${VAR:-valore}) non sono decorativi: senza, una variabile non
+      # impostata su Coolify arriverebbe al container come stringa VUOTA, che è
+      # peggio di assente — os.getenv restituirebbe "" al posto del default.
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME:-spese_db}
+      - SECRET_KEY=${SECRET_KEY}
+      - ALGORITHM=${ALGORITHM:-HS256}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      - REFRESH_TOKEN_EXPIRE_DAYS=${REFRESH_TOKEN_EXPIRE_DAYS:-90}
+      - COOKIE_SECURE=${COOKIE_SECURE:-true}
+      # Vuoto = cookie legato al solo host (vedi backend/.env.example).
+      - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
+      - FRONTEND_URL=${FRONTEND_URL:-https://conti.spassocasa.it}
+      # Lo scheduler gira in-process: un solo backend deve averlo acceso.
+      - RUN_SCHEDULER=${RUN_SCHEDULER:-true}
+      # Open Banking (solo l'utente admin). La chiave privata è un file montato da
+      # Coolify (Storages → file mount su /app/secrets/enablebanking_private.pem).
+      - ENABLE_BANKING_APP_ID=${ENABLE_BANKING_APP_ID:-}
+      - ENABLE_BANKING_PRIVATE_KEY_PATH=${ENABLE_BANKING_PRIVATE_KEY_PATH:-/app/secrets/enablebanking_private.pem}
+      - ENABLE_BANKING_PRIVATE_KEY=${ENABLE_BANKING_PRIVATE_KEY:-}
+      - ENABLE_BANKING_BASE_URL=${ENABLE_BANKING_BASE_URL:-https://api.enablebanking.com}
+      - OPEN_BANKING_ADMIN_EMAIL=${OPEN_BANKING_ADMIN_EMAIL:-}
+      - BANK_CONNECTOR_ENCRYPTION_KEY=${BANK_CONNECTOR_ENCRYPTION_KEY:-}
+      # SMTP per il reset password. Senza SMTP_SERVER il link viene solo loggato.
+      - SMTP_SERVER=${SMTP_SERVER:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - EMAIL_FROM=${EMAIL_FROM:-noreply@spassocasa.it}
+    healthcheck:
+      # /api/health interroga il database: se il BE non raggiunge Postgres il
+      # container risulta unhealthy, invece di "healthy" con ogni chiamata in 500.
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

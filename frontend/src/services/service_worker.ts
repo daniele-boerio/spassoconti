@@ -8,11 +8,8 @@
 export function registerServiceWorker(): void {
   if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return;
 
-  const api = import.meta.env.VITE_API_URL ?? "";
-  const url = `/sw.js?api=${encodeURIComponent(api)}`;
-
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register(url).catch((error) => {
+    navigator.serviceWorker.register("/sw.js").catch((error) => {
       // Senza service worker l'app funziona come prima, solo non offline.
       console.warn("Service worker non registrato", error);
     });

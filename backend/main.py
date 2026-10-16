@@ -3,13 +3,16 @@ import logging
 import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import APIRouter, Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 from apscheduler.schedulers.background import BackgroundScheduler
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+from database import get_db
 from rate_limit import limiter
 from services import (
     task_snapshot_patrimonio,
@@ -86,13 +89,19 @@ async def lifespan(app: FastAPI):
 # generabile in locale (ENVIRONMENT != "production").
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "development").lower() == "production"
 
+# FE e BE stanno sullo stesso dominio: nginx (container frontend) serve la SPA e
+# gira al backend tutto ciò che inizia per /api, senza toccare il path. Quindi
+# ogni endpoint vive sotto questo prefisso.
+API_PREFIX = "/api"
+
 app = FastAPI(
     title="Calcolatore Spese API",
     servers=[{"url": "/", "description": "Default"}],
     lifespan=lifespan,
-    docs_url=None if IS_PRODUCTION else "/docs",
-    redoc_url=None if IS_PRODUCTION else "/redoc",
-    openapi_url=None if IS_PRODUCTION else "/openapi.json",
+    # Sotto /api come tutto il resto: fuori da /api nginx serve il frontend.
+    docs_url=None if IS_PRODUCTION else f"{API_PREFIX}/docs",
+    redoc_url=None if IS_PRODUCTION else f"{API_PREFIX}/redoc",
+    openapi_url=None if IS_PRODUCTION else f"{API_PREFIX}/openapi.json",
 )
 
 # Rate limiting: senza, /login è aperto al brute force e /auth/forgot-password
@@ -150,27 +159,41 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Registrazione dei Router
-app.include_router(user.router)  # Gli endpoint di user (login/register)
-app.include_router(conti.router)  # Gli endpoint dei conti
-app.include_router(categorie.router)  # Categorie
-app.include_router(sottocategorie.router)  # Sottocategorie
-app.include_router(transazioni.router)  # Transazioni
-app.include_router(investimenti.router)  # Investimenti
-app.include_router(tag.router)  # Tag
-app.include_router(ricorrenze.router)  # Ricorrenze
-app.include_router(statistics.router)  # Statistiche
-app.include_router(charts.router)  # API Grafici
-app.include_router(bank_connectors.router)  # Connettore bancario
-app.include_router(bank_proposals.router)  # Proposte di transazione (tutte le pending)
-app.include_router(open_banking.router)  # Open Banking (GoCardless) requisition flow
-app.include_router(debiti.router)  # Debiti
-app.include_router(auth.router)  # Endpoint per forgot-password e reset-password
+# Registrazione dei Router, tutti sotto API_PREFIX
+api = APIRouter(prefix=API_PREFIX)
+api.include_router(user.router)  # Gli endpoint di user (login/register)
+api.include_router(conti.router)  # Gli endpoint dei conti
+api.include_router(categorie.router)  # Categorie
+api.include_router(sottocategorie.router)  # Sottocategorie
+api.include_router(transazioni.router)  # Transazioni
+api.include_router(investimenti.router)  # Investimenti
+api.include_router(tag.router)  # Tag
+api.include_router(ricorrenze.router)  # Ricorrenze
+api.include_router(statistics.router)  # Statistiche
+api.include_router(charts.router)  # API Grafici
+api.include_router(bank_connectors.router)  # Connettore bancario
+api.include_router(bank_proposals.router)  # Proposte di transazione (tutte le pending)
+api.include_router(open_banking.router)  # Open Banking (GoCardless) requisition flow
+api.include_router(debiti.router)  # Debiti
+api.include_router(auth.router)  # Endpoint per forgot-password e reset-password
 
 
-@app.get("/")
-async def root():
-    return {"status": "online", "message": "Backend SpassoConti attivo"}
+# Il healthcheck del container. Tocca il database apposta: un BE che risponde ma
+# non raggiunge Postgres non serve a niente, e deve risultare unhealthy (così un
+# deploy con le DB_* sbagliate torna indietro da solo invece di andare in 500).
+@api.get("/health", include_in_schema=False)
+def health(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception:
+        logger.exception("Healthcheck: database non raggiungibile")
+        return JSONResponse(
+            status_code=503, content={"status": "error", "database": "unreachable"}
+        )
+    return {"status": "ok", "database": "ok"}
+
+
+app.include_router(api)
 
 
 if __name__ == "__main__":

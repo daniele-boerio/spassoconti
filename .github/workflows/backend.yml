@@ -1,18 +1,23 @@
-# Test del BE a ogni push e pull request.
+# Test del backend a ogni push e pull request che tocca backend/.
 #
 # Gli stessi comandi che si lanciano in locale (vedi CLAUDE.md): pytest su
 # SQLite in memoria, quindi niente Postgres da avviare. Python 3.12 come
 # l'immagine del Dockerfile.
-name: CI
+name: Backend
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
+    paths: ["backend/**", ".github/workflows/backend.yml"]
   pull_request:
+    paths: ["backend/**", ".github/workflows/backend.yml"]
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
     # `database.py` compone l'URL di Postgres dalle variabili d'ambiente già
     # all'import (in locale le prende dal .env, che in CI non c'è): senza, la
     # porta diventa "None" e l'import fallisce. Valori fittizi bastano — i test
@@ -31,8 +36,8 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: |
-            requirements.txt
-            requirements-dev.txt
+            backend/requirements.txt
+            backend/requirements-dev.txt
 
       - name: Dipendenze
         run: pip install -r requirements.txt -r requirements-dev.txt

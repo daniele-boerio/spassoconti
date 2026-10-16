@@ -90,7 +90,7 @@ component.
   that now exist: `npm run typecheck` (tsc, strict), `npm run lint` (ESLint over JS+TS)
   and `npm run test` (Vitest) — run them after changes. ESLint keeps a batch of
   pre-existing react-hooks/`no-explicit-any` findings as **warnings** (tech-debt);
-  don't let the count grow. CI (`.github/workflows/ci.yml`) runs all three plus
+  don't let the count grow. CI (`.github/workflows/frontend.yml` at the repo root) runs all three plus
   `npm run build`. A formatter (prettier) is still intentionally not set up.
 - Don't edit `vite.config.js` / `package.json` unless the task genuinely requires it.
 - `App.jsx`, `main.jsx`, and `services/api.js` are intentionally JS — leave them JS.

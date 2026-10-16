@@ -25,7 +25,8 @@ REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 90))
 REFRESH_COOKIE_NAME = "refresh_token"
 # Il refresh token serve solo agli endpoint di sessione: limitando il path, il
 # cookie non viene nemmeno allegato alle altre chiamate API.
-REFRESH_COOKIE_PATH = "/auth"
+# Il path è quello visto dal browser, quindi con il prefisso /api (main.API_PREFIX).
+REFRESH_COOKIE_PATH = "/api/auth"
 
 
 def get_password_hash(password: str):
@@ -189,7 +190,7 @@ def consume_refresh_token(db: Session, raw_token: str) -> RefreshToken:
 def set_refresh_cookie(response: Response, raw_token: str) -> None:
     """Cookie httpOnly: illeggibile da JavaScript, quindi non rubabile via XSS.
 
-    FE e BE stanno su due sottodomini dello stesso sito (conti/conti-be.spassocasa.it),
+    FE e BE stanno sullo stesso dominio (conti.spassocasa.it, il BE sotto /api),
     quindi `SameSite=Lax` è sufficiente e il cookie viaggia comunque. In locale
     (http) `Secure` va spento, altrimenti il browser scarta il cookie.
     """

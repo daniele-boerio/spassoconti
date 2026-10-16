@@ -74,7 +74,7 @@ def api(monkeypatch):
     monkeypatch.setattr(auth, "SessionLocal", TestingSessionLocal)
     monkeypatch.setattr(services, "SessionLocal", TestingSessionLocal)
 
-    with TestClient(app) as c:
+    with TestClient(app, base_url="http://testserver/api") as c:
         c.session_factory = TestingSessionLocal
 
         def registra(username="mario"):

@@ -17,7 +17,9 @@ database = os.getenv("DB_NAME")
 # Componi l'URL in modo dinamico
 SQLALCHEMY_DATABASE_URL = f"postgresql://{user}:{password}@{host}:{port}/{database}"
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
+# pool_pre_ping: dopo un riavvio di Postgres le connessioni nel pool sono morte, e
+# senza il ping la prima richiesta su ciascuna andrebbe in 500.
+engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()

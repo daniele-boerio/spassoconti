@@ -48,7 +48,7 @@ def client(monkeypatch):
     app.dependency_overrides[get_db] = override_get_db
     monkeypatch.setattr(auth, "SessionLocal", TestingSessionLocal)
 
-    with TestClient(app) as c:
+    with TestClient(app, base_url="http://testserver/api") as c:
         c.session_factory = TestingSessionLocal
         yield c
 

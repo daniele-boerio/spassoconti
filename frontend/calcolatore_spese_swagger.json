@@ -11,13 +11,13 @@
     }
   ],
   "paths": {
-    "/register": {
+    "/api/register": {
       "post": {
         "tags": [
           "User"
         ],
         "summary": "Register User",
-        "operationId": "register_user_register_post",
+        "operationId": "register_user_api_register_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -52,18 +52,18 @@
         }
       }
     },
-    "/login": {
+    "/api/login": {
       "post": {
         "tags": [
           "User"
         ],
         "summary": "Login",
-        "operationId": "login_login_post",
+        "operationId": "login_api_login_post",
         "requestBody": {
           "content": {
             "application/x-www-form-urlencoded": {
               "schema": {
-                "$ref": "#/components/schemas/Body_login_login_post"
+                "$ref": "#/components/schemas/Body_login_api_login_post"
               }
             }
           },
@@ -93,13 +93,13 @@
         }
       }
     },
-    "/me": {
+    "/api/me": {
       "get": {
         "tags": [
           "User"
         ],
         "summary": "Get Me",
-        "operationId": "get_me_me_get",
+        "operationId": "get_me_api_me_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -124,7 +124,7 @@
         ],
         "summary": "Update Me",
         "description": "Cambia lo username dal profilo.\n\nLe stesse regole della registrazione: minuscolo e unico. Il token resta\nvalido — l'identità è l'id, non il nome.",
-        "operationId": "update_me_me_put",
+        "operationId": "update_me_api_me_put",
         "requestBody": {
           "content": {
             "application/json": {
@@ -164,13 +164,13 @@
         ]
       }
     },
-    "/monthlyBudget": {
+    "/api/monthlyBudget": {
       "put": {
         "tags": [
           "User"
         ],
         "summary": "Update Monthly Budget",
-        "operationId": "update_monthly_budget_monthlyBudget_put",
+        "operationId": "update_monthly_budget_api_monthlyBudget_put",
         "security": [
           {
             "HTTPBearer": []
@@ -224,13 +224,13 @@
         }
       }
     },
-    "/conti": {
+    "/api/conti": {
       "post": {
         "tags": [
           "Conti"
         ],
         "summary": "Create Conto",
-        "operationId": "create_conto_conti_post",
+        "operationId": "create_conto_api_conti_post",
         "security": [
           {
             "HTTPBearer": []
@@ -274,7 +274,7 @@
           "Conti"
         ],
         "summary": "Get Conti",
-        "operationId": "get_conti_conti_get",
+        "operationId": "get_conti_api_conti_get",
         "security": [
           {
             "HTTPBearer": []
@@ -380,7 +380,7 @@
                   "items": {
                     "$ref": "#/components/schemas/ContoOut"
                   },
-                  "title": "Response Get Conti Conti Get"
+                  "title": "Response Get Conti Api Conti Get"
                 }
               }
             }
@@ -398,13 +398,13 @@
         }
       }
     },
-    "/conti/{conto_id}": {
+    "/api/conti/{conto_id}": {
       "put": {
         "tags": [
           "Conti"
         ],
         "summary": "Update Conto",
-        "operationId": "update_conto_conti__conto_id__put",
+        "operationId": "update_conto_api_conti__conto_id__put",
         "security": [
           {
             "HTTPBearer": []
@@ -459,7 +459,7 @@
           "Conti"
         ],
         "summary": "Delete Conto",
-        "operationId": "delete_conto_conti__conto_id__delete",
+        "operationId": "delete_conto_api_conti__conto_id__delete",
         "security": [
           {
             "HTTPBearer": []
@@ -493,14 +493,14 @@
         }
       }
     },
-    "/conti/verifica-saldi": {
+    "/api/conti/verifica-saldi": {
       "get": {
         "tags": [
           "Conti"
         ],
         "summary": "Get Verifica Saldi",
         "description": "I conti il cui saldo non torna con i movimenti registrati.\n\nLista vuota = tutto in ordine. Un conto mai controllato viene fotografato\nadesso e non compare: è il suo punto di partenza.",
-        "operationId": "get_verifica_saldi_conti_verifica_saldi_get",
+        "operationId": "get_verifica_saldi_api_conti_verifica_saldi_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -511,7 +511,7 @@
                     "$ref": "#/components/schemas/VerificaSaldoOut"
                   },
                   "type": "array",
-                  "title": "Response Get Verifica Saldi Conti Verifica Saldi Get"
+                  "title": "Response Get Verifica Saldi Api Conti Verifica Saldi Get"
                 }
               }
             }
@@ -524,14 +524,14 @@
         ]
       }
     },
-    "/conti/{conto_id}/correggi-saldo": {
+    "/api/conti/{conto_id}/correggi-saldo": {
       "post": {
         "tags": [
           "Conti"
         ],
         "summary": "Correggi Saldo",
         "description": "Riporta il saldo a quello che dicono i movimenti.\n\nÈ l'uscita dal \"saldo fuori sincrono\": se invece il saldo giusto è quello\nattuale, basta reimpostarlo dal form del conto, che riallinea la base.",
-        "operationId": "correggi_saldo_conti__conto_id__correggi_saldo_post",
+        "operationId": "correggi_saldo_api_conti__conto_id__correggi_saldo_post",
         "security": [
           {
             "HTTPBearer": []
@@ -572,14 +572,14 @@
         }
       }
     },
-    "/conti/patrimonio": {
+    "/api/conti/patrimonio": {
       "get": {
         "tags": [
           "Conti"
         ],
         "summary": "Get Patrimonio",
         "description": "Le foto mensili del patrimonio, dalla più vecchia alla più recente.\n\nLa lista parte dal giorno in cui il job ha iniziato a scattarle: prima non\nc'è niente, e chi la legge deve mostrare un confronto solo quando ci sono\ndue foto — non inventarne uno.",
-        "operationId": "get_patrimonio_conti_patrimonio_get",
+        "operationId": "get_patrimonio_api_conti_patrimonio_get",
         "security": [
           {
             "HTTPBearer": []
@@ -609,7 +609,7 @@
                   "items": {
                     "$ref": "#/components/schemas/PatrimonioOut"
                   },
-                  "title": "Response Get Patrimonio Conti Patrimonio Get"
+                  "title": "Response Get Patrimonio Api Conti Patrimonio Get"
                 }
               }
             }
@@ -627,14 +627,14 @@
         }
       }
     },
-    "/conti/consolida": {
+    "/api/conti/consolida": {
       "post": {
         "tags": [
           "Conti"
         ],
         "summary": "Consolida Conti",
         "description": "Unisce tutti i conti in quello di default.\n\nPer chi tiene i soldi in un posto solo e non vuole rincorrere il saldo di\ntre conti: movimenti, ricorrenze, debiti e saldi finiscono sul conto di\ndefault, gli altri vanno in soft-delete.\n\nIdempotente: con un conto solo non fa niente e ritorna quello.",
-        "operationId": "consolida_conti_conti_consolida_post",
+        "operationId": "consolida_conti_api_conti_consolida_post",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -654,14 +654,14 @@
         ]
       }
     },
-    "/conti/rinuncia": {
+    "/api/conti/rinuncia": {
       "post": {
         "tags": [
           "Conti"
         ],
         "summary": "Rinuncia Ai Conti",
         "description": "Porta tutti i movimenti sul conto invisibile e leva di mezzo i conti veri.\n\nÈ il verso opposto di `assorbi`: là un conto vero si prende i movimenti\nrimasti senza conto, qui i movimenti tornano tutti a non averne uno. Serve a\nchi le spese vuole segnarle e basta, senza modellare da dove escono.\n\nNessuna transazione viene toccata nel merito: cambia solo il conto a cui\npunta. I conti veri vanno in soft-delete come in `consolida`, quindi niente\nè distrutto e restano ripristinabili con POST /conti/{id}/restore — quello\nche non si ricostruisce è *quale* movimento stava su quale conto.\n\nIdempotente: chi ha già solo il conto invisibile se lo ritrova identico.",
-        "operationId": "rinuncia_ai_conti_conti_rinuncia_post",
+        "operationId": "rinuncia_ai_conti_api_conti_rinuncia_post",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -681,14 +681,14 @@
         ]
       }
     },
-    "/conti/{conto_id}/assorbi": {
+    "/api/conti/{conto_id}/assorbi": {
       "post": {
         "tags": [
           "Conti"
         ],
         "summary": "Assorbi Conto Virtuale",
         "description": "Porta su questo conto i movimenti rimasti sul conto virtuale.\n\nÈ il seguito naturale di \"ho aperto un conto vero\": i movimenti registrati\nprima, quando un conto non c'era, si leggono come \"senza conto\" e da qui si\nassegnano a quello giusto.",
-        "operationId": "assorbi_conto_virtuale_conti__conto_id__assorbi_post",
+        "operationId": "assorbi_conto_virtuale_api_conti__conto_id__assorbi_post",
         "security": [
           {
             "HTTPBearer": []
@@ -729,14 +729,14 @@
         }
       }
     },
-    "/conti/{conto_id}/restore": {
+    "/api/conti/{conto_id}/restore": {
       "post": {
         "tags": [
           "Conti"
         ],
         "summary": "Restore Conto",
         "description": "Ripristina un conto in soft-delete (e le transazioni nascoste insieme a esso).\n\nRete di sicurezza per le cancellazioni accidentali: non c'è una UI dedicata,\nsi invoca direttamente (es. dalla pagina /docs o via curl).",
-        "operationId": "restore_conto_conti__conto_id__restore_post",
+        "operationId": "restore_conto_api_conti__conto_id__restore_post",
         "security": [
           {
             "HTTPBearer": []
@@ -777,13 +777,13 @@
         }
       }
     },
-    "/conti/currentMonthExpenses": {
+    "/api/conti/currentMonthExpenses": {
       "get": {
         "tags": [
           "Conti"
         ],
         "summary": "Get Current Month Expenses",
-        "operationId": "get_current_month_expenses_conti_currentMonthExpenses_get",
+        "operationId": "get_current_month_expenses_api_conti_currentMonthExpenses_get",
         "security": [
           {
             "HTTPBearer": []
@@ -827,13 +827,13 @@
         }
       }
     },
-    "/conti/expensesByCategory": {
+    "/api/conti/expensesByCategory": {
       "get": {
         "tags": [
           "Conti"
         ],
         "summary": "Get Expenses By Category",
-        "operationId": "get_expenses_by_category_conti_expensesByCategory_get",
+        "operationId": "get_expenses_by_category_api_conti_expensesByCategory_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -851,13 +851,13 @@
         ]
       }
     },
-    "/categorie": {
+    "/api/categorie": {
       "post": {
         "tags": [
           "Categorie"
         ],
         "summary": "Create Categoria",
-        "operationId": "create_categoria_categorie_post",
+        "operationId": "create_categoria_api_categorie_post",
         "security": [
           {
             "HTTPBearer": []
@@ -901,7 +901,7 @@
           "Categorie"
         ],
         "summary": "Get Categorie",
-        "operationId": "get_categorie_categorie_get",
+        "operationId": "get_categorie_api_categorie_get",
         "security": [
           {
             "HTTPBearer": []
@@ -989,7 +989,7 @@
                   "items": {
                     "$ref": "#/components/schemas/CategoriaOut"
                   },
-                  "title": "Response Get Categorie Categorie Get"
+                  "title": "Response Get Categorie Api Categorie Get"
                 }
               }
             }
@@ -1007,13 +1007,13 @@
         }
       }
     },
-    "/categorie/{categoria_id}": {
+    "/api/categorie/{categoria_id}": {
       "put": {
         "tags": [
           "Categorie"
         ],
         "summary": "Update Categoria",
-        "operationId": "update_categoria_categorie__categoria_id__put",
+        "operationId": "update_categoria_api_categorie__categoria_id__put",
         "security": [
           {
             "HTTPBearer": []
@@ -1068,7 +1068,7 @@
           "Categorie"
         ],
         "summary": "Delete Categoria",
-        "operationId": "delete_categoria_categorie__categoria_id__delete",
+        "operationId": "delete_categoria_api_categorie__categoria_id__delete",
         "security": [
           {
             "HTTPBearer": []
@@ -1102,13 +1102,13 @@
         }
       }
     },
-    "/categorie/migrate": {
+    "/api/categorie/migrate": {
       "post": {
         "tags": [
           "Categorie"
         ],
         "summary": "Migrate Transactions",
-        "operationId": "migrate_transactions_categorie_migrate_post",
+        "operationId": "migrate_transactions_api_categorie_migrate_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1146,13 +1146,13 @@
         ]
       }
     },
-    "/sottocategorie": {
+    "/api/sottocategorie": {
       "get": {
         "tags": [
           "Sottocategorie"
         ],
         "summary": "Get Sottocategorie",
-        "operationId": "get_sottocategorie_sottocategorie_get",
+        "operationId": "get_sottocategorie_api_sottocategorie_get",
         "security": [
           {
             "HTTPBearer": []
@@ -1224,7 +1224,7 @@
                   "items": {
                     "$ref": "#/components/schemas/SottocategoriaOut"
                   },
-                  "title": "Response Get Sottocategorie Sottocategorie Get"
+                  "title": "Response Get Sottocategorie Api Sottocategorie Get"
                 }
               }
             }
@@ -1242,13 +1242,13 @@
         }
       }
     },
-    "/categorie/{categoria_id}/sottocategorie": {
+    "/api/categorie/{categoria_id}/sottocategorie": {
       "post": {
         "tags": [
           "Sottocategorie"
         ],
         "summary": "Add Sottocategorie",
-        "operationId": "add_sottocategorie_categorie__categoria_id__sottocategorie_post",
+        "operationId": "add_sottocategorie_api_categorie__categoria_id__sottocategorie_post",
         "security": [
           {
             "HTTPBearer": []
@@ -1289,7 +1289,7 @@
                   "items": {
                     "$ref": "#/components/schemas/SottocategoriaOut"
                   },
-                  "title": "Response Add Sottocategorie Categorie  Categoria Id  Sottocategorie Post"
+                  "title": "Response Add Sottocategorie Api Categorie  Categoria Id  Sottocategorie Post"
                 }
               }
             }
@@ -1307,13 +1307,13 @@
         }
       }
     },
-    "/sottocategorie/{sottocategoria_id}": {
+    "/api/sottocategorie/{sottocategoria_id}": {
       "put": {
         "tags": [
           "Sottocategorie"
         ],
         "summary": "Update Sottocategoria",
-        "operationId": "update_sottocategoria_sottocategorie__sottocategoria_id__put",
+        "operationId": "update_sottocategoria_api_sottocategorie__sottocategoria_id__put",
         "security": [
           {
             "HTTPBearer": []
@@ -1368,7 +1368,7 @@
           "Sottocategorie"
         ],
         "summary": "Delete Sottocategoria",
-        "operationId": "delete_sottocategoria_sottocategorie__sottocategoria_id__delete",
+        "operationId": "delete_sottocategoria_api_sottocategorie__sottocategoria_id__delete",
         "security": [
           {
             "HTTPBearer": []
@@ -1402,13 +1402,13 @@
         }
       }
     },
-    "/transazioni": {
+    "/api/transazioni": {
       "post": {
         "tags": [
           "Transazioni"
         ],
         "summary": "Create Transazione",
-        "operationId": "create_transazione_transazioni_post",
+        "operationId": "create_transazione_api_transazioni_post",
         "security": [
           {
             "HTTPBearer": []
@@ -1471,7 +1471,7 @@
           "Transazioni"
         ],
         "summary": "Get Recent Transazioni",
-        "operationId": "get_recent_transazioni_transazioni_get",
+        "operationId": "get_recent_transazioni_api_transazioni_get",
         "security": [
           {
             "HTTPBearer": []
@@ -1719,7 +1719,7 @@
                   "items": {
                     "$ref": "#/components/schemas/TransazioneOut"
                   },
-                  "title": "Response Get Recent Transazioni Transazioni Get"
+                  "title": "Response Get Recent Transazioni Api Transazioni Get"
                 }
               }
             }
@@ -1737,13 +1737,13 @@
         }
       }
     },
-    "/transazioni/{transazione_id}/split": {
+    "/api/transazioni/{transazione_id}/split": {
       "post": {
         "tags": [
           "Transazioni"
         ],
         "summary": "Split Transazione",
-        "operationId": "split_transazione_transazioni__transazione_id__split_post",
+        "operationId": "split_transazione_api_transazioni__transazione_id__split_post",
         "security": [
           {
             "HTTPBearer": []
@@ -1780,7 +1780,7 @@
                   "items": {
                     "$ref": "#/components/schemas/TransazioneOut"
                   },
-                  "title": "Response Split Transazione Transazioni  Transazione Id  Split Post"
+                  "title": "Response Split Transazione Api Transazioni  Transazione Id  Split Post"
                 }
               }
             }
@@ -1798,13 +1798,13 @@
         }
       }
     },
-    "/transazioni/paginated": {
+    "/api/transazioni/paginated": {
       "get": {
         "tags": [
           "Transazioni"
         ],
         "summary": "Get Transazioni",
-        "operationId": "get_transazioni_transazioni_paginated_get",
+        "operationId": "get_transazioni_api_transazioni_paginated_get",
         "security": [
           {
             "HTTPBearer": []
@@ -2077,14 +2077,14 @@
         }
       }
     },
-    "/transazioni/export": {
+    "/api/transazioni/export": {
       "get": {
         "tags": [
           "Transazioni"
         ],
         "summary": "Export Transazioni",
         "description": "I movimenti filtrati come CSV, con gli stessi filtri della lista.\n\nSeparatore \";\" e virgola decimale (Excel in italiano), BOM UTF-8 così gli\naccenti si leggono anche in Excel. I nomi di conti e tassonomia si leggono\nuna volta per tabella, non una per riga.",
-        "operationId": "export_transazioni_transazioni_export_get",
+        "operationId": "export_transazioni_api_transazioni_export_get",
         "security": [
           {
             "HTTPBearer": []
@@ -2335,14 +2335,14 @@
         }
       }
     },
-    "/transazioni/{transazione_id}": {
+    "/api/transazioni/{transazione_id}": {
       "get": {
         "tags": [
           "Transazioni"
         ],
         "summary": "Get Transazione",
         "description": "Una transazione sola, col saldo del conto subito dopo.\n\nIl dettaglio di un movimento è l'unico posto in cui quel numero serve, ed\nè anche l'unico in cui si può calcolare senza far pagare a una lista una\nsomma progressiva per riga.",
-        "operationId": "get_transazione_transazioni__transazione_id__get",
+        "operationId": "get_transazione_api_transazioni__transazione_id__get",
         "security": [
           {
             "HTTPBearer": []
@@ -2387,7 +2387,7 @@
           "Transazioni"
         ],
         "summary": "Update Transazione",
-        "operationId": "update_transazione_transazioni__transazione_id__put",
+        "operationId": "update_transazione_api_transazioni__transazione_id__put",
         "security": [
           {
             "HTTPBearer": []
@@ -2442,7 +2442,7 @@
           "Transazioni"
         ],
         "summary": "Delete Transazione",
-        "operationId": "delete_transazione_transazioni__transazione_id__delete",
+        "operationId": "delete_transazione_api_transazioni__transazione_id__delete",
         "security": [
           {
             "HTTPBearer": []
@@ -2481,13 +2481,13 @@
         }
       }
     },
-    "/investimenti": {
+    "/api/investimenti": {
       "get": {
         "tags": [
           "Investimenti"
         ],
         "summary": "Get Investimenti",
-        "operationId": "get_investimenti_investimenti_get",
+        "operationId": "get_investimenti_api_investimenti_get",
         "security": [
           {
             "HTTPBearer": []
@@ -2689,7 +2689,7 @@
                   "items": {
                     "$ref": "#/components/schemas/InvestimentoOut"
                   },
-                  "title": "Response Get Investimenti Investimenti Get"
+                  "title": "Response Get Investimenti Api Investimenti Get"
                 }
               }
             }
@@ -2711,7 +2711,7 @@
           "Investimenti"
         ],
         "summary": "Create Investimento",
-        "operationId": "create_investimento_investimenti_post",
+        "operationId": "create_investimento_api_investimenti_post",
         "security": [
           {
             "HTTPBearer": []
@@ -2751,13 +2751,13 @@
         }
       }
     },
-    "/investimenti/{id}": {
+    "/api/investimenti/{id}": {
       "get": {
         "tags": [
           "Investimenti"
         ],
         "summary": "Get Investimento",
-        "operationId": "get_investimento_investimenti__id__get",
+        "operationId": "get_investimento_api_investimenti__id__get",
         "security": [
           {
             "HTTPBearer": []
@@ -2802,7 +2802,7 @@
           "Investimenti"
         ],
         "summary": "Patch Investimento",
-        "operationId": "patch_investimento_investimenti__id__patch",
+        "operationId": "patch_investimento_api_investimenti__id__patch",
         "security": [
           {
             "HTTPBearer": []
@@ -2857,7 +2857,7 @@
           "Investimenti"
         ],
         "summary": "Delete Investimento",
-        "operationId": "delete_investimento_investimenti__id__delete",
+        "operationId": "delete_investimento_api_investimenti__id__delete",
         "security": [
           {
             "HTTPBearer": []
@@ -2891,13 +2891,13 @@
         }
       }
     },
-    "/investimenti/{id}/operazione": {
+    "/api/investimenti/{id}/operazione": {
       "post": {
         "tags": [
           "Investimenti"
         ],
         "summary": "Add Operazione",
-        "operationId": "add_operazione_investimenti__id__operazione_post",
+        "operationId": "add_operazione_api_investimenti__id__operazione_post",
         "security": [
           {
             "HTTPBearer": []
@@ -2948,13 +2948,13 @@
         }
       }
     },
-    "/investimenti/{id}/operazione/{op_id}": {
+    "/api/investimenti/{id}/operazione/{op_id}": {
       "put": {
         "tags": [
           "Investimenti"
         ],
         "summary": "Update Operazione",
-        "operationId": "update_operazione_investimenti__id__operazione__op_id__put",
+        "operationId": "update_operazione_api_investimenti__id__operazione__op_id__put",
         "security": [
           {
             "HTTPBearer": []
@@ -3018,7 +3018,7 @@
           "Investimenti"
         ],
         "summary": "Delete Operazione",
-        "operationId": "delete_operazione_investimenti__id__operazione__op_id__delete",
+        "operationId": "delete_operazione_api_investimenti__id__operazione__op_id__delete",
         "security": [
           {
             "HTTPBearer": []
@@ -3061,13 +3061,13 @@
         }
       }
     },
-    "/tags": {
+    "/api/tags": {
       "post": {
         "tags": [
           "Tag"
         ],
         "summary": "Create Tag",
-        "operationId": "create_tag_tags_post",
+        "operationId": "create_tag_api_tags_post",
         "security": [
           {
             "HTTPBearer": []
@@ -3111,7 +3111,7 @@
           "Tag"
         ],
         "summary": "Get Tags",
-        "operationId": "get_tags_tags_get",
+        "operationId": "get_tags_api_tags_get",
         "security": [
           {
             "HTTPBearer": []
@@ -3167,7 +3167,7 @@
                   "items": {
                     "$ref": "#/components/schemas/TagOut"
                   },
-                  "title": "Response Get Tags Tags Get"
+                  "title": "Response Get Tags Api Tags Get"
                 }
               }
             }
@@ -3185,13 +3185,13 @@
         }
       }
     },
-    "/tags/{tag_id}": {
+    "/api/tags/{tag_id}": {
       "put": {
         "tags": [
           "Tag"
         ],
         "summary": "Update Tag",
-        "operationId": "update_tag_tags__tag_id__put",
+        "operationId": "update_tag_api_tags__tag_id__put",
         "security": [
           {
             "HTTPBearer": []
@@ -3246,7 +3246,7 @@
           "Tag"
         ],
         "summary": "Delete Tag",
-        "operationId": "delete_tag_tags__tag_id__delete",
+        "operationId": "delete_tag_api_tags__tag_id__delete",
         "security": [
           {
             "HTTPBearer": []
@@ -3280,13 +3280,13 @@
         }
       }
     },
-    "/ricorrenze": {
+    "/api/ricorrenze": {
       "post": {
         "tags": [
           "Ricorrenze"
         ],
         "summary": "Create Ricorrenza",
-        "operationId": "create_ricorrenza_ricorrenze_post",
+        "operationId": "create_ricorrenza_api_ricorrenze_post",
         "security": [
           {
             "HTTPBearer": []
@@ -3330,7 +3330,7 @@
           "Ricorrenze"
         ],
         "summary": "Get Ricorrenze",
-        "operationId": "get_ricorrenze_ricorrenze_get",
+        "operationId": "get_ricorrenze_api_ricorrenze_get",
         "security": [
           {
             "HTTPBearer": []
@@ -3585,7 +3585,7 @@
                   "items": {
                     "$ref": "#/components/schemas/RicorrenzaOut"
                   },
-                  "title": "Response Get Ricorrenze Ricorrenze Get"
+                  "title": "Response Get Ricorrenze Api Ricorrenze Get"
                 }
               }
             }
@@ -3603,13 +3603,13 @@
         }
       }
     },
-    "/ricorrenze/{ricorrenza_id}": {
+    "/api/ricorrenze/{ricorrenza_id}": {
       "put": {
         "tags": [
           "Ricorrenze"
         ],
         "summary": "Update Ricorrenza",
-        "operationId": "update_ricorrenza_ricorrenze__ricorrenza_id__put",
+        "operationId": "update_ricorrenza_api_ricorrenze__ricorrenza_id__put",
         "security": [
           {
             "HTTPBearer": []
@@ -3664,7 +3664,7 @@
           "Ricorrenze"
         ],
         "summary": "Delete Ricorrenza",
-        "operationId": "delete_ricorrenza_ricorrenze__ricorrenza_id__delete",
+        "operationId": "delete_ricorrenza_api_ricorrenze__ricorrenza_id__delete",
         "security": [
           {
             "HTTPBearer": []
@@ -3698,14 +3698,14 @@
         }
       }
     },
-    "/ricorrenze/{ricorrenza_id}/esegui": {
+    "/api/ricorrenze/{ricorrenza_id}/esegui": {
       "post": {
         "tags": [
           "Ricorrenze"
         ],
         "summary": "Esegui Ricorrenza Ora",
         "description": "Registra adesso una ricorrenza già scaduta.\n\nServe quando lo scheduler notturno non è passato (macchina spenta, deploy\na cavallo di mezzanotte): la ricorrenza resta indietro e da qui la si\nsblocca a mano. Non anticipa niente — una ricorrenza non ancora scaduta\nviene rifiutata — quindi non può fare doppioni con il task.\n\nRegistra una sola occorrenza, la più vecchia: se ne mancano altre, la\nricorrenza resta fra le scadute e si registra di nuovo. Per quelle a\nimporto variabile è l'unico modo di registrarle, con l'importo vero.",
-        "operationId": "esegui_ricorrenza_ora_ricorrenze__ricorrenza_id__esegui_post",
+        "operationId": "esegui_ricorrenza_ora_api_ricorrenze__ricorrenza_id__esegui_post",
         "security": [
           {
             "HTTPBearer": []
@@ -3763,13 +3763,13 @@
         }
       }
     },
-    "/statistics/yearDetails": {
+    "/api/statistics/yearDetails": {
       "get": {
         "tags": [
           "Statistics"
         ],
         "summary": "Get Year Details Statistics",
-        "operationId": "get_year_details_statistics_statistics_yearDetails_get",
+        "operationId": "get_year_details_statistics_api_statistics_yearDetails_get",
         "security": [
           {
             "HTTPBearer": []
@@ -3867,13 +3867,13 @@
         }
       }
     },
-    "/statistics/monthDetails": {
+    "/api/statistics/monthDetails": {
       "get": {
         "tags": [
           "Statistics"
         ],
         "summary": "Get Month Details Statistics",
-        "operationId": "get_month_details_statistics_statistics_monthDetails_get",
+        "operationId": "get_month_details_statistics_api_statistics_monthDetails_get",
         "security": [
           {
             "HTTPBearer": []
@@ -3982,13 +3982,13 @@
         }
       }
     },
-    "/charts/income-expense": {
+    "/api/charts/income-expense": {
       "get": {
         "tags": [
           "Charts"
         ],
         "summary": "Get Chart Income Expense",
-        "operationId": "get_chart_income_expense_charts_income_expense_get",
+        "operationId": "get_chart_income_expense_api_charts_income_expense_get",
         "security": [
           {
             "HTTPBearer": []
@@ -4101,7 +4101,7 @@
                   "items": {
                     "$ref": "#/components/schemas/MonthlyIncomeExpenseOut"
                   },
-                  "title": "Response Get Chart Income Expense Charts Income Expense Get"
+                  "title": "Response Get Chart Income Expense Api Charts Income Expense Get"
                 }
               }
             }
@@ -4119,13 +4119,13 @@
         }
       }
     },
-    "/charts/savings": {
+    "/api/charts/savings": {
       "get": {
         "tags": [
           "Charts"
         ],
         "summary": "Get Chart Savings",
-        "operationId": "get_chart_savings_charts_savings_get",
+        "operationId": "get_chart_savings_api_charts_savings_get",
         "security": [
           {
             "HTTPBearer": []
@@ -4238,7 +4238,7 @@
                   "items": {
                     "$ref": "#/components/schemas/MonthlySavingsOut"
                   },
-                  "title": "Response Get Chart Savings Charts Savings Get"
+                  "title": "Response Get Chart Savings Api Charts Savings Get"
                 }
               }
             }
@@ -4256,13 +4256,13 @@
         }
       }
     },
-    "/charts/expense-composition": {
+    "/api/charts/expense-composition": {
       "get": {
         "tags": [
           "Charts"
         ],
         "summary": "Get Chart Expense Composition",
-        "operationId": "get_chart_expense_composition_charts_expense_composition_get",
+        "operationId": "get_chart_expense_composition_api_charts_expense_composition_get",
         "security": [
           {
             "HTTPBearer": []
@@ -4375,7 +4375,7 @@
                   "items": {
                     "$ref": "#/components/schemas/ExpenseCompositionOut"
                   },
-                  "title": "Response Get Chart Expense Composition Charts Expense Composition Get"
+                  "title": "Response Get Chart Expense Composition Api Charts Expense Composition Get"
                 }
               }
             }
@@ -4393,13 +4393,13 @@
         }
       }
     },
-    "/charts/category-trend": {
+    "/api/charts/category-trend": {
       "get": {
         "tags": [
           "Charts"
         ],
         "summary": "Get Chart Category Trend",
-        "operationId": "get_chart_category_trend_charts_category_trend_get",
+        "operationId": "get_chart_category_trend_api_charts_category_trend_get",
         "security": [
           {
             "HTTPBearer": []
@@ -4505,7 +4505,7 @@
                   "items": {
                     "$ref": "#/components/schemas/CategoryTrendOut"
                   },
-                  "title": "Response Get Chart Category Trend Charts Category Trend Get"
+                  "title": "Response Get Chart Category Trend Api Charts Category Trend Get"
                 }
               }
             }
@@ -4523,13 +4523,13 @@
         }
       }
     },
-    "/conti/{conto_id}/bank-connector": {
+    "/api/conti/{conto_id}/bank-connector": {
       "get": {
         "tags": [
           "BankConnector"
         ],
         "summary": "Get Bank Connector Config",
-        "operationId": "get_bank_connector_config_conti__conto_id__bank_connector_get",
+        "operationId": "get_bank_connector_config_api_conti__conto_id__bank_connector_get",
         "security": [
           {
             "HTTPBearer": []
@@ -4574,7 +4574,7 @@
           "BankConnector"
         ],
         "summary": "Configure Bank Connector",
-        "operationId": "configure_bank_connector_conti__conto_id__bank_connector_post",
+        "operationId": "configure_bank_connector_api_conti__conto_id__bank_connector_post",
         "security": [
           {
             "HTTPBearer": []
@@ -4625,13 +4625,13 @@
         }
       }
     },
-    "/conti/{conto_id}/bank-connector/sync": {
+    "/api/conti/{conto_id}/bank-connector/sync": {
       "post": {
         "tags": [
           "BankConnector"
         ],
         "summary": "Sync Bank Connector",
-        "operationId": "sync_bank_connector_conti__conto_id__bank_connector_sync_post",
+        "operationId": "sync_bank_connector_api_conti__conto_id__bank_connector_sync_post",
         "security": [
           {
             "HTTPBearer": []
@@ -4672,14 +4672,14 @@
         }
       }
     },
-    "/conti/{conto_id}/bank-connector/import-statement": {
+    "/api/conti/{conto_id}/bank-connector/import-statement": {
       "post": {
         "tags": [
           "BankConnector"
         ],
         "summary": "Import Bank Statement",
         "description": "Importa un estratto conto (PDF, Excel .xlsx o CSV): ne estrae i movimenti\n(opzionalmente nel range data_da..data_a) e crea proposte PENDING, come una\nsincronizzazione bancaria. L'utente le rivede poi dal dialog delle proposte,\nassegnando categoria/sottocategoria/conto/tag prima di confermarle.\n\nExcel/CSV usano un parser a colonne (affidabile); il PDF un parser euristico\n(`balance_column` è rilevante solo per il PDF).",
-        "operationId": "import_bank_statement_conti__conto_id__bank_connector_import_statement_post",
+        "operationId": "import_bank_statement_api_conti__conto_id__bank_connector_import_statement_post",
         "security": [
           {
             "HTTPBearer": []
@@ -4701,7 +4701,7 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_import_bank_statement_conti__conto_id__bank_connector_import_statement_post"
+                "$ref": "#/components/schemas/Body_import_bank_statement_api_conti__conto_id__bank_connector_import_statement_post"
               }
             }
           }
@@ -4730,13 +4730,13 @@
         }
       }
     },
-    "/conti/{conto_id}/bank-connector/proposals": {
+    "/api/conti/{conto_id}/bank-connector/proposals": {
       "get": {
         "tags": [
           "BankConnector"
         ],
         "summary": "Get Bank Transaction Proposals",
-        "operationId": "get_bank_transaction_proposals_conti__conto_id__bank_connector_proposals_get",
+        "operationId": "get_bank_transaction_proposals_api_conti__conto_id__bank_connector_proposals_get",
         "security": [
           {
             "HTTPBearer": []
@@ -4763,7 +4763,7 @@
                   "items": {
                     "$ref": "#/components/schemas/BankTransactionProposalOut"
                   },
-                  "title": "Response Get Bank Transaction Proposals Conti  Conto Id  Bank Connector Proposals Get"
+                  "title": "Response Get Bank Transaction Proposals Api Conti  Conto Id  Bank Connector Proposals Get"
                 }
               }
             }
@@ -4781,13 +4781,13 @@
         }
       }
     },
-    "/conti/{conto_id}/bank-connector/proposals/{proposal_id}/import": {
+    "/api/conti/{conto_id}/bank-connector/proposals/{proposal_id}/import": {
       "post": {
         "tags": [
           "BankConnector"
         ],
         "summary": "Import Bank Transaction Proposal Endpoint",
-        "operationId": "import_bank_transaction_proposal_endpoint_conti__conto_id__bank_connector_proposals__proposal_id__import_post",
+        "operationId": "import_bank_transaction_proposal_endpoint_api_conti__conto_id__bank_connector_proposals__proposal_id__import_post",
         "security": [
           {
             "HTTPBearer": []
@@ -4847,13 +4847,13 @@
         }
       }
     },
-    "/conti/{conto_id}/bank-connector/proposals/{proposal_id}/discard": {
+    "/api/conti/{conto_id}/bank-connector/proposals/{proposal_id}/discard": {
       "post": {
         "tags": [
           "BankConnector"
         ],
         "summary": "Discard Bank Transaction Proposal Endpoint",
-        "operationId": "discard_bank_transaction_proposal_endpoint_conti__conto_id__bank_connector_proposals__proposal_id__discard_post",
+        "operationId": "discard_bank_transaction_proposal_endpoint_api_conti__conto_id__bank_connector_proposals__proposal_id__discard_post",
         "security": [
           {
             "HTTPBearer": []
@@ -4901,13 +4901,13 @@
         }
       }
     },
-    "/bank-proposals": {
+    "/api/bank-proposals": {
       "get": {
         "tags": [
           "BankConnector"
         ],
         "summary": "Get All Pending Proposals",
-        "operationId": "get_all_pending_proposals_bank_proposals_get",
+        "operationId": "get_all_pending_proposals_api_bank_proposals_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -4918,7 +4918,7 @@
                     "$ref": "#/components/schemas/BankTransactionProposalOut"
                   },
                   "type": "array",
-                  "title": "Response Get All Pending Proposals Bank Proposals Get"
+                  "title": "Response Get All Pending Proposals Api Bank Proposals Get"
                 }
               }
             }
@@ -4931,14 +4931,14 @@
         ]
       }
     },
-    "/open-banking/institutions": {
+    "/api/open-banking/institutions": {
       "get": {
         "tags": [
           "OpenBanking"
         ],
         "summary": "Get Institutions",
         "description": "Step 1 support: list the banks (ASPSPs) the user can pick from.",
-        "operationId": "get_institutions_open_banking_institutions_get",
+        "operationId": "get_institutions_api_open_banking_institutions_get",
         "security": [
           {
             "HTTPBearer": []
@@ -4966,7 +4966,7 @@
                   "items": {
                     "$ref": "#/components/schemas/InstitutionOut"
                   },
-                  "title": "Response Get Institutions Open Banking Institutions Get"
+                  "title": "Response Get Institutions Api Open Banking Institutions Get"
                 }
               }
             }
@@ -4984,14 +4984,14 @@
         }
       }
     },
-    "/open-banking/auth": {
+    "/api/open-banking/auth": {
       "post": {
         "tags": [
           "OpenBanking"
         ],
         "summary": "Start Bank Auth",
         "description": "Step 2: start the Enable Banking authorization and return the bank URL.\n\nWe generate a unique `state`, persist it on the conto and send it to Enable\nBanking; the bank echoes it back to the FE callback so we can match it.",
-        "operationId": "start_bank_auth_open_banking_auth_post",
+        "operationId": "start_bank_auth_api_open_banking_auth_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -5031,14 +5031,14 @@
         ]
       }
     },
-    "/open-banking/sessions": {
+    "/api/open-banking/sessions": {
       "post": {
         "tags": [
           "OpenBanking"
         ],
         "summary": "Confirm Bank Session",
         "description": "Step 6: the handshake. Match the callback `state` to the pending conto,\nexchange the `code` for a session and store the linked account uid.",
-        "operationId": "confirm_bank_session_open_banking_sessions_post",
+        "operationId": "confirm_bank_session_api_open_banking_sessions_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -5078,14 +5078,14 @@
         ]
       }
     },
-    "/open-banking/link/{conto_id}": {
+    "/api/open-banking/link/{conto_id}": {
       "delete": {
         "tags": [
           "OpenBanking"
         ],
         "summary": "Disconnect Bank",
         "description": "Scollega il conto dalla banca: azzera tutti i riferimenti al connettore\ncosì il conto torna 'non collegato' (e si può eventualmente ricollegare).",
-        "operationId": "disconnect_bank_open_banking_link__conto_id__delete",
+        "operationId": "disconnect_bank_api_open_banking_link__conto_id__delete",
         "security": [
           {
             "HTTPBearer": []
@@ -5126,13 +5126,13 @@
         }
       }
     },
-    "/debiti": {
+    "/api/debiti": {
       "get": {
         "tags": [
           "Debiti"
         ],
         "summary": "List Debiti",
-        "operationId": "list_debiti_debiti_get",
+        "operationId": "list_debiti_api_debiti_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -5143,7 +5143,7 @@
                     "$ref": "#/components/schemas/DebitoOut"
                   },
                   "type": "array",
-                  "title": "Response List Debiti Debiti Get"
+                  "title": "Response List Debiti Api Debiti Get"
                 }
               }
             }
@@ -5160,7 +5160,7 @@
           "Debiti"
         ],
         "summary": "Create Debito",
-        "operationId": "create_debito_debiti_post",
+        "operationId": "create_debito_api_debiti_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -5200,13 +5200,13 @@
         ]
       }
     },
-    "/debiti/{debito_id}": {
+    "/api/debiti/{debito_id}": {
       "put": {
         "tags": [
           "Debiti"
         ],
         "summary": "Update Debito",
-        "operationId": "update_debito_debiti__debito_id__put",
+        "operationId": "update_debito_api_debiti__debito_id__put",
         "security": [
           {
             "HTTPBearer": []
@@ -5261,7 +5261,7 @@
           "Debiti"
         ],
         "summary": "Delete Debito",
-        "operationId": "delete_debito_debiti__debito_id__delete",
+        "operationId": "delete_debito_api_debiti__debito_id__delete",
         "security": [
           {
             "HTTPBearer": []
@@ -5310,13 +5310,13 @@
         }
       }
     },
-    "/debiti/{debito_id}/pay": {
+    "/api/debiti/{debito_id}/pay": {
       "post": {
         "tags": [
           "Debiti"
         ],
         "summary": "Pay Debito",
-        "operationId": "pay_debito_debiti__debito_id__pay_post",
+        "operationId": "pay_debito_api_debiti__debito_id__pay_post",
         "security": [
           {
             "HTTPBearer": []
@@ -5367,13 +5367,13 @@
         }
       }
     },
-    "/auth/forgot-password": {
+    "/api/auth/forgot-password": {
       "post": {
         "tags": [
           "Auth"
         ],
         "summary": "Forgot Password",
-        "operationId": "forgot_password_auth_forgot_password_post",
+        "operationId": "forgot_password_api_auth_forgot_password_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -5406,13 +5406,13 @@
         }
       }
     },
-    "/auth/reset-password": {
+    "/api/auth/reset-password": {
       "post": {
         "tags": [
           "Auth"
         ],
         "summary": "Reset Password",
-        "operationId": "reset_password_auth_reset_password_post",
+        "operationId": "reset_password_api_auth_reset_password_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -5445,14 +5445,14 @@
         }
       }
     },
-    "/auth/refresh": {
+    "/api/auth/refresh": {
       "post": {
         "tags": [
           "Auth"
         ],
         "summary": "Refresh Access Token",
         "description": "Rinnova l'access token a partire dal cookie httpOnly.\n\nIl refresh token viene ruotato a ogni uso: quello vecchio è bruciato e ne\nviene emesso uno nuovo nella stessa famiglia. È quello che tiene l'utente\nloggato sul dispositivo senza mai riesporre le credenziali.",
-        "operationId": "refresh_access_token_auth_refresh_post",
+        "operationId": "refresh_access_token_api_auth_refresh_post",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -5467,14 +5467,14 @@
         }
       }
     },
-    "/auth/logout": {
+    "/api/auth/logout": {
       "post": {
         "tags": [
           "Auth"
         ],
         "summary": "Logout",
         "description": "Chiude la sessione di QUESTO dispositivo (revoca la famiglia del cookie).",
-        "operationId": "logout_auth_logout_post",
+        "operationId": "logout_api_auth_logout_post",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -5487,14 +5487,14 @@
         }
       }
     },
-    "/auth/logout-all": {
+    "/api/auth/logout-all": {
       "post": {
         "tags": [
           "Auth"
         ],
         "summary": "Logout All Devices",
         "description": "Disconnette l'utente da tutti i dispositivi.",
-        "operationId": "logout_all_devices_auth_logout_all_post",
+        "operationId": "logout_all_devices_api_auth_logout_all_post",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -5510,22 +5510,6 @@
             "HTTPBearer": []
           }
         ]
-      }
-    },
-    "/": {
-      "get": {
-        "summary": "Root",
-        "operationId": "root__get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
       }
     }
   },
@@ -5958,7 +5942,7 @@
         ],
         "title": "BankTransactionProposalStatus"
       },
-      "Body_import_bank_statement_conti__conto_id__bank_connector_import_statement_post": {
+      "Body_import_bank_statement_api_conti__conto_id__bank_connector_import_statement_post": {
         "properties": {
           "file": {
             "type": "string",
@@ -5999,9 +5983,9 @@
         "required": [
           "file"
         ],
-        "title": "Body_import_bank_statement_conti__conto_id__bank_connector_import_statement_post"
+        "title": "Body_import_bank_statement_api_conti__conto_id__bank_connector_import_statement_post"
       },
-      "Body_login_login_post": {
+      "Body_login_api_login_post": {
         "properties": {
           "grant_type": {
             "anyOf": [
@@ -6058,7 +6042,7 @@
           "username",
           "password"
         ],
-        "title": "Body_login_login_post"
+        "title": "Body_login_api_login_post"
       },
       "CategoriaCreate": {
         "properties": {

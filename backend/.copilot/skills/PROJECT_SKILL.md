@@ -41,7 +41,7 @@ Checklist per aggiungere una nuova feature
 5. Aggiungi test in `tests/` (pytest, fixture `db_session`) e lanciali.
 6. Aggiorna `README` e i changelog interni.
 7. Verifica che `alembic revision --autogenerate` generi migration coerenti; applica su DB di sviluppo.
-8. Se l'endpoint cambia forma, riesporta lo swagger in `FE/calcolatore_spese_swagger.json` e aggiorna `interfaces.ts`/`api_calls.ts` nel FE.
+8. Se l'endpoint cambia forma, riesporta lo swagger in `frontend/calcolatore_spese_swagger.json` e aggiorna `interfaces.ts`/`api_calls.ts` nel FE.
 
 Suggerimenti per le migrazioni
 
@@ -50,7 +50,7 @@ Suggerimenti per le migrazioni
 
 CI & Quality
 
-- Gate: `pytest`, lanciato anche dalla CI (`.github/workflows/ci.yml`). Pre-commit non esiste ancora.
+- Gate: `pytest`, lanciato anche dalla CI (`.github/workflows/backend.yml` (alla radice del repo)). Pre-commit non esiste ancora.
 
 Esempi di comandi utili
 

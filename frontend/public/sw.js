@@ -16,11 +16,11 @@
  *   l'ultima salvata, così Home e Movimenti mostrano gli ultimi dati visti.
  *   Le scritture (POST/PUT/DELETE) non passano mai dalla cache.
  *
- * L'origine dell'API arriva nella query di registrazione (`sw.js?api=...`):
- * il service worker non vede le variabili di Vite.
+ * L'API sta sullo stesso origin dell'app, sotto /api (nginx la gira al BE).
  */
 
-const VERSION = "v1";
+// v2: l'API è passata dal dominio conti-be a /api, le cache v1 vanno buttate.
+const VERSION = "v2";
 const SHELL_CACHE = `shell-${VERSION}`;
 const ASSET_CACHE = `assets-${VERSION}`;
 const API_CACHE = `api-${VERSION}`;
@@ -30,15 +30,6 @@ const KEEP = [SHELL_CACHE, ASSET_CACHE, API_CACHE];
 // buttano i più vecchi.
 const MAX_ASSETS = 150;
 const MAX_API_ENTRIES = 80;
-
-const API_ORIGIN = (() => {
-  try {
-    const api = new URL(self.location.href).searchParams.get("api");
-    return api ? new URL(api).origin : null;
-  } catch {
-    return null;
-  }
-})();
 
 const SHELL = ["/", "/index.html", "/manifest.json", "/icon.svg", "/icon-192.png"];
 
@@ -123,7 +114,12 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (url.origin === self.location.origin) {
-    if (url.pathname.startsWith("/assets/")) {
+    if (url.pathname.startsWith("/api/")) {
+      // File generati (export CSV) e refresh di sessione non si salvano.
+      if (!url.pathname.includes("/export") && !url.pathname.startsWith("/api/auth")) {
+        event.respondWith(networkFirst(request, API_CACHE, null, MAX_API_ENTRIES));
+      }
+    } else if (url.pathname.startsWith("/assets/")) {
       event.respondWith(cacheFirst(request, ASSET_CACHE, MAX_ASSETS));
     } else if (SHELL.includes(url.pathname) || /\.(png|svg|ico)$/.test(url.pathname)) {
       event.respondWith(cacheFirst(request, SHELL_CACHE));
@@ -136,16 +132,5 @@ self.addEventListener("fetch", (event) => {
     url.origin === "https://fonts.gstatic.com"
   ) {
     event.respondWith(cacheFirst(request, ASSET_CACHE));
-    return;
-  }
-
-  // File generati (export CSV) e refresh di sessione non si salvano.
-  if (
-    API_ORIGIN &&
-    url.origin === API_ORIGIN &&
-    !url.pathname.includes("/export") &&
-    !url.pathname.startsWith("/auth")
-  ) {
-    event.respondWith(networkFirst(request, API_CACHE, null, MAX_API_ENTRIES));
   }
 });

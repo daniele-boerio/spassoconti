@@ -43,7 +43,7 @@ def client(monkeypatch):
     # get_current_user_id apre una sessione propria via SessionLocal: la puntiamo al DB di test
     monkeypatch.setattr(auth, "SessionLocal", TestingSessionLocal)
 
-    with TestClient(app) as c:
+    with TestClient(app, base_url="http://testserver/api") as c:
         yield c
 
     app.dependency_overrides.clear()
