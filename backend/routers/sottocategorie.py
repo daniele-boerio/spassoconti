@@ -1,0 +1,175 @@
+import logging
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from database import get_db
+import auth
+from models import Categoria, Sottocategoria
+from schemas import (
+    SottocategoriaCreate,
+    SottocategoriaOut,
+    SottocategoriaUpdate,
+    SottocategoriaFilters,
+)
+from services import apply_filters_and_sort
+
+router = APIRouter(tags=["Sottocategorie"])
+
+logger = logging.getLogger(__name__)
+
+# --- ENDPOINT SOTTOCATEGORIE ---
+
+
+@router.get("/sottocategorie", response_model=list[SottocategoriaOut])
+def get_sottocategorie(
+    filters: SottocategoriaFilters = Depends(),
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    query = db.query(Sottocategoria).filter(Sottocategoria.user_id == current_user_id)
+    query = apply_filters_and_sort(query, Sottocategoria, filters=filters)
+    return query.all()
+
+
+@router.post(
+    "/categorie/{categoria_id}/sottocategorie", response_model=list[SottocategoriaOut]
+)
+def add_sottocategorie(
+    categoria_id: int,
+    sub_data_list: list[SottocategoriaCreate],
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    # 1. Verifica proprietà e recupera i permessi della categoria madre
+    db_cat = (
+        db.query(Categoria)
+        .filter(Categoria.id == categoria_id, Categoria.user_id == current_user_id)
+        .first()
+    )
+
+    if not db_cat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Parent category not found or unauthorized",
+        )
+
+    try:
+        new_subcategories = []
+        for sub_data in sub_data_list:
+            # 2. Logica di Ereditarietà: la sub non può superare i permessi della madre
+            # Se la madre è False, forziamo la sub a False
+            final_solo_entrata = sub_data.solo_entrata if db_cat.solo_entrata else False
+            final_solo_uscita = sub_data.solo_uscita if db_cat.solo_uscita else False
+
+            new_sub = Sottocategoria(
+                nome=sub_data.nome.strip(),
+                categoria_id=categoria_id,
+                user_id=current_user_id,
+                solo_entrata=final_solo_entrata,
+                solo_uscita=final_solo_uscita,
+            )
+            db.add(new_sub)
+            new_subcategories.append(new_sub)
+
+        # 3. Commit unico per tutte le sottocategorie
+        db.commit()
+
+        # Refresh per ottenere gli ID generati dal database
+        for sub in new_subcategories:
+            db.refresh(sub)
+
+        return new_subcategories
+
+    except Exception as e:
+        db.rollback()
+        # Loggare l'errore internamente aiuta il debug
+        logger.exception("Errore creazione sottocategorie")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while creating subcategories",
+        )
+
+
+@router.put("/sottocategorie/{sottocategoria_id}", response_model=SottocategoriaOut)
+def update_sottocategoria(
+    sottocategoria_id: int,
+    sub_data: SottocategoriaUpdate,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    # 1. Recupero semplice della sottocategoria
+    db_sub = (
+        db.query(Sottocategoria)
+        .filter(
+            Sottocategoria.id == sottocategoria_id,
+            Sottocategoria.user_id == current_user_id,
+        )
+        .first()
+    )
+
+    if not db_sub:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Subcategory not found or unauthorized",
+        )
+
+    try:
+        # 2. Trasformiamo l'input in dizionario (es. {"solo_entrata": False, ...})
+        update_data = sub_data.model_dump(exclude_unset=True)
+
+        # 3. Applichiamo ogni valore ricevuto direttamente al database
+        for key, value in update_data.items():
+            setattr(db_sub, key, value)
+
+        db.commit()
+        db.refresh(db_sub)
+        return db_sub
+
+    except Exception as e:
+        db.rollback()
+        # Stampiamo l'errore nei log del server per sicurezza
+        logger.exception("Errore update sottocategoria")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update the subcategory",
+        )
+
+
+@router.delete(
+    "/sottocategorie/{sottocategoria_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+def delete_sottocategoria(
+    sottocategoria_id: int,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    # Cerchiamo la sottocategoria assicurandoci che appartenga all'utente
+    db_sub = (
+        db.query(Sottocategoria)
+        .filter(
+            Sottocategoria.id == sottocategoria_id,
+            Sottocategoria.user_id == current_user_id,
+        )
+        .first()
+    )
+
+    if not db_sub:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Subcategory not found or unauthorized",
+        )
+
+    try:
+        db.delete(db_sub)
+        db.commit()
+        # In una DELETE con 204, il return None è implicito,
+        # ma scriverlo non fa male.
+        return None
+    except Exception as e:
+        db.rollback()
+        # Loggare l'errore reale (es. IntegrityError) aiuta te nel debug,
+        # mentre l'utente riceve il messaggio generico.
+        logger.exception("Errore eliminazione sottocategoria %s", sottocategoria_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Cannot delete subcategory. It's likely linked to existing transactions.",
+        )

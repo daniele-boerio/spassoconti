@@ -1,0 +1,832 @@
+from datetime import date, datetime, timezone
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+from database import get_db
+import auth
+from models import (
+    Categoria,
+    Conto,
+    Debito,
+    PatrimonioSnapshot,
+    Transazione,
+    User,
+    Ricorrenza,
+)
+from schemas import (
+    ContoCreate,
+    ContoOut,
+    ContoUpdate,
+    ContoFilters,
+    CurrentMonthBudgetOut,
+    PatrimonioOut,
+    VerificaSaldoOut,
+)
+from schemas.transazione import TipoTransazione
+from services import (
+    allinea_saldi_base_utente,
+    allinea_saldo_base,
+    apply_filters_and_sort,
+    verifica_saldi,
+    ensure_conto_virtuale,
+    ensure_default_conto,
+    importo_effettivo,
+)
+import calendar
+from decimal import Decimal
+
+router = APIRouter(prefix="/conti", tags=["Conti"])
+
+# --- ENDPOINT CONTI ---
+
+
+def reset_default_account(db: Session, user_id: int):
+    """Imposta a False il campo default per tutti i conti dell'utente."""
+    db.query(Conto).filter(Conto.user_id == user_id, Conto.default).update(
+        {"default": False}
+    )
+
+
+@router.post("", response_model=ContoOut)
+def create_conto(
+    conto: ContoCreate,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    # Se è indicato un conto sorgente (ricarica automatica), dev'essere dell'utente
+    if conto.conto_sorgente_id is not None:
+        sorgente = (
+            db.query(Conto)
+            .filter(
+                Conto.id == conto.conto_sorgente_id,
+                Conto.user_id == current_user_id,
+                Conto.deleted_at.is_(None),
+            )
+            .first()
+        )
+        if not sorgente:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Source account not found or unauthorized",
+            )
+
+    try:
+        if conto.default:
+            reset_default_account(db, current_user_id)
+
+        new_conto = Conto(**conto.model_dump(), user_id=current_user_id)
+        db.add(new_conto)
+        db.flush()
+        # Il saldo iniziale lo decide l'utente: è il punto di partenza.
+        allinea_saldo_base(db, new_conto)
+        db.commit()
+        db.refresh(new_conto)
+        return new_conto
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while creating the account",
+        )
+
+
+@router.get("", response_model=list[ContoOut])
+def get_conti(
+    filters: ContoFilters = Depends(),
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    # Chi non ha nessun conto ne riceve uno adesso: è il punto in cui ogni
+    # schermata passa prima di poter fare qualcosa, quindi è anche il punto in
+    # cui l'app smette di essere un vicolo cieco per un utente nuovo.
+    if (
+        db.query(Conto)
+        .filter(Conto.user_id == current_user_id, Conto.deleted_at.is_(None))
+        .first()
+        is None
+    ):
+        ensure_default_conto(db, current_user_id)
+        db.commit()
+
+    query = db.query(Conto).filter(Conto.user_id == current_user_id)
+
+    query = apply_filters_and_sort(
+        query,
+        Conto,
+        filters=filters,
+    )
+
+    return query.all()
+
+
+@router.put("/{conto_id}", response_model=ContoOut)
+def update_conto(
+    conto_id: int,
+    conto_data: ContoUpdate,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    db_conto = (
+        db.query(Conto)
+        .filter(
+            Conto.id == conto_id,
+            Conto.user_id == current_user_id,
+            Conto.deleted_at.is_(None),
+        )
+        .first()
+    )
+
+    if not db_conto:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Account not found or unauthorized",
+        )
+
+    update_data = conto_data.model_dump(exclude_unset=True)
+
+    # Se si imposta un conto sorgente, dev'essere dell'utente (e non sé stesso).
+    # Fatto FUORI dal try: gli HTTPException qui non vanno mascherati come 500.
+    if update_data.get("conto_sorgente_id") is not None:
+        if update_data["conto_sorgente_id"] == conto_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="An account cannot be its own source",
+            )
+        sorgente = (
+            db.query(Conto)
+            .filter(
+                Conto.id == update_data["conto_sorgente_id"],
+                Conto.user_id == current_user_id,
+                Conto.deleted_at.is_(None),
+            )
+            .first()
+        )
+        if not sorgente:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Source account not found or unauthorized",
+            )
+
+    try:
+        if update_data.get("default") is True:
+            reset_default_account(db, current_user_id)
+
+        saldo_prima = db_conto.saldo
+
+        for key, value in update_data.items():
+            setattr(db_conto, key, value)
+
+        # Saldo corretto a mano: da qui in poi è quello giusto. Solo se è
+        # cambiato davvero — il form lo rimanda anche quando si cambia il nome,
+        # e riallineare lì nasconderebbe uno sfasamento vero.
+        if "saldo" in update_data and update_data["saldo"] != saldo_prima:
+            allinea_saldo_base(db, db_conto)
+
+        db.commit()
+        db.refresh(db_conto)
+        return db_conto
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update account details",
+        )
+
+
+@router.delete("/{conto_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_conto(
+    conto_id: int,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    db_conto = (
+        db.query(Conto)
+        .filter(
+            Conto.id == conto_id,
+            Conto.user_id == current_user_id,
+            Conto.deleted_at.is_(None),
+        )
+        .first()
+    )
+
+    if not db_conto:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Account not found"
+        )
+
+    try:
+        now = datetime.now(timezone.utc)
+
+        # SOFT-DELETE: nascondiamo il conto e le sue transazioni, senza cancellarle.
+        # Restano nel DB e sono ripristinabili con POST /conti/{id}/restore.
+        # (Storicamente qui c'era un DELETE fisico che, via ON DELETE CASCADE,
+        # distruggeva IRREVERSIBILMENTE tutte le transazioni del conto: un click
+        # accidentale bruciava lo storico. Ora niente più.)
+        #
+        # Non tocchiamo ricorrenze né i riferimenti conto_sorgente: gli scheduler
+        # saltano i conti con deleted_at valorizzato, quindi tutto resta coerente e
+        # completamente reversibile al restore.
+        db.query(Transazione).filter(
+            Transazione.conto_id == conto_id,
+            Transazione.user_id == current_user_id,
+            Transazione.deleted_at.is_(None),
+        ).update({"deleted_at": now}, synchronize_session=False)
+
+        db_conto.deleted_at = now
+
+        # Movimenti spostati o nascosti fra conti: la base dei saldi cambia
+        # senza errori, quindi si riparte da qui (vedi services.verifica_saldi).
+        allinea_saldi_base_utente(db, current_user_id)
+
+        db.commit()
+        return None
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while deleting the account",
+        )
+
+
+def _sposta_su(db: Session, user_id: int, sorgenti: list[int], target: Conto):
+    """Porta su `target` tutto quello che punta ai conti `sorgenti`.
+
+    Tocca anche le transazioni in soft-delete: se un domani vengono
+    ripristinate non devono ritrovarsi appese a un conto che non c'è più.
+    """
+    if not sorgenti:
+        return
+
+    db.query(Transazione).filter(
+        Transazione.user_id == user_id,
+        Transazione.conto_id.in_(sorgenti),
+    ).update({"conto_id": target.id}, synchronize_session=False)
+
+    db.query(Transazione).filter(
+        Transazione.user_id == user_id,
+        Transazione.conto_destinazione_id.in_(sorgenti),
+    ).update({"conto_destinazione_id": target.id}, synchronize_session=False)
+
+    # Un giro fra due conti ora uniti non ha più due estremi: resta la riga,
+    # sparisce la destinazione.
+    db.query(Transazione).filter(
+        Transazione.user_id == user_id,
+        Transazione.conto_destinazione_id.isnot(None),
+        Transazione.conto_destinazione_id == Transazione.conto_id,
+    ).update({"conto_destinazione_id": None}, synchronize_session=False)
+
+    db.query(Ricorrenza).filter(
+        Ricorrenza.user_id == user_id,
+        Ricorrenza.conto_id.in_(sorgenti),
+    ).update({"conto_id": target.id}, synchronize_session=False)
+
+    db.query(Debito).filter(
+        Debito.user_id == user_id,
+        Debito.conto_id.in_(sorgenti),
+    ).update({"conto_id": target.id}, synchronize_session=False)
+
+
+@router.get("/verifica-saldi", response_model=list[VerificaSaldoOut])
+def get_verifica_saldi(
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    """I conti il cui saldo non torna con i movimenti registrati.
+
+    Lista vuota = tutto in ordine. Un conto mai controllato viene fotografato
+    adesso e non compare: è il suo punto di partenza.
+    """
+    try:
+        discrepanze = verifica_saldi(db, current_user_id)
+        db.commit()  # salva le basi appena fotografate
+        return discrepanze
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to verify account balances",
+        )
+
+
+@router.post("/{conto_id}/correggi-saldo", response_model=ContoOut)
+def correggi_saldo(
+    conto_id: int,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    """Riporta il saldo a quello che dicono i movimenti.
+
+    È l'uscita dal "saldo fuori sincrono": se invece il saldo giusto è quello
+    attuale, basta reimpostarlo dal form del conto, che riallinea la base.
+    """
+    db_conto = (
+        db.query(Conto)
+        .filter(
+            Conto.id == conto_id,
+            Conto.user_id == current_user_id,
+            Conto.deleted_at.is_(None),
+        )
+        .first()
+    )
+
+    if not db_conto:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Account not found"
+        )
+
+    try:
+        riga = next(
+            (
+                r
+                for r in verifica_saldi(db, current_user_id)
+                if r["conto_id"] == db_conto.id
+            ),
+            None,
+        )
+        if riga is not None:
+            db_conto.saldo = riga["saldo_atteso"]
+
+        db.commit()
+        db.refresh(db_conto)
+        return db_conto
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to correct the account balance",
+        )
+
+
+@router.get("/patrimonio", response_model=list[PatrimonioOut])
+def get_patrimonio(
+    mesi: int = Query(12, ge=1, le=60),
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    """Le foto mensili del patrimonio, dalla più vecchia alla più recente.
+
+    La lista parte dal giorno in cui il job ha iniziato a scattarle: prima non
+    c'è niente, e chi la legge deve mostrare un confronto solo quando ci sono
+    due foto — non inventarne uno.
+    """
+    righe = (
+        db.query(PatrimonioSnapshot)
+        .filter(PatrimonioSnapshot.user_id == current_user_id)
+        .order_by(PatrimonioSnapshot.anno.desc(), PatrimonioSnapshot.mese.desc())
+        .limit(mesi)
+        .all()
+    )
+
+    return [
+        PatrimonioOut(
+            label=f"{riga.anno}-{riga.mese:02d}",
+            conti=riga.conti,
+            titoli=riga.titoli,
+            totale=riga.conti + riga.titoli,
+        )
+        for riga in reversed(righe)
+    ]
+
+
+@router.post("/consolida", response_model=ContoOut)
+def consolida_conti(
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    """Unisce tutti i conti in quello di default.
+
+    Per chi tiene i soldi in un posto solo e non vuole rincorrere il saldo di
+    tre conti: movimenti, ricorrenze, debiti e saldi finiscono sul conto di
+    default, gli altri vanno in soft-delete.
+
+    Idempotente: con un conto solo non fa niente e ritorna quello.
+    """
+    target = ensure_default_conto(db, current_user_id)
+
+    altri = (
+        db.query(Conto)
+        .filter(
+            Conto.user_id == current_user_id,
+            Conto.deleted_at.is_(None),
+            Conto.id != target.id,
+        )
+        .all()
+    )
+
+    if not altri:
+        db.commit()
+        db.refresh(target)
+        return target
+
+    try:
+        now = datetime.now(timezone.utc)
+        ids = [conto.id for conto in altri]
+
+        _sposta_su(db, current_user_id, ids, target)
+
+        for conto in altri:
+            target.saldo += conto.saldo
+            conto.deleted_at = now
+            # Il collegamento bancario muore col conto: il default non può
+            # ereditarne più di uno, e tenerli appesi a un conto nascosto
+            # farebbe sincronizzare movimenti che nessuno vedrebbe.
+            conto.bank_connector_provider = None
+            conto.bank_connector_account_id = None
+            conto.bank_connector_institution_id = None
+            conto.bank_connector_session_id = None
+            conto.bank_connector_last_error = None
+
+        # La ricarica automatica pescava da un conto che ora non esiste più.
+        if target.conto_sorgente_id in ids:
+            target.conto_sorgente_id = None
+            target.ricarica_automatica = False
+
+        # Movimenti spostati o nascosti fra conti: la base dei saldi cambia
+        # senza errori, quindi si riparte da qui (vedi services.verifica_saldi).
+        allinea_saldi_base_utente(db, current_user_id)
+
+        db.commit()
+        db.refresh(target)
+        return target
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while merging the accounts",
+        )
+
+
+@router.post("/rinuncia", response_model=ContoOut)
+def rinuncia_ai_conti(
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    """Porta tutti i movimenti sul conto invisibile e leva di mezzo i conti veri.
+
+    È il verso opposto di `assorbi`: là un conto vero si prende i movimenti
+    rimasti senza conto, qui i movimenti tornano tutti a non averne uno. Serve a
+    chi le spese vuole segnarle e basta, senza modellare da dove escono.
+
+    Nessuna transazione viene toccata nel merito: cambia solo il conto a cui
+    punta. I conti veri vanno in soft-delete come in `consolida`, quindi niente
+    è distrutto e restano ripristinabili con POST /conti/{id}/restore — quello
+    che non si ricostruisce è *quale* movimento stava su quale conto.
+
+    Idempotente: chi ha già solo il conto invisibile se lo ritrova identico.
+    """
+    target = ensure_conto_virtuale(db, current_user_id)
+
+    reali = (
+        db.query(Conto)
+        .filter(
+            Conto.user_id == current_user_id,
+            Conto.deleted_at.is_(None),
+            Conto.virtuale.is_(False),
+        )
+        .all()
+    )
+
+    if not reali:
+        db.commit()
+        db.refresh(target)
+        return target
+
+    try:
+        now = datetime.now(timezone.utc)
+        ids = [conto.id for conto in reali]
+
+        _sposta_su(db, current_user_id, ids, target)
+
+        for conto in reali:
+            # Il saldo non si perde per strada: il patrimonio in cima a Conti
+            # somma anche il conto invisibile, e azzerarlo qui farebbe sparire
+            # dei soldi che nessuno ha chiesto di far sparire.
+            target.saldo += conto.saldo
+            conto.deleted_at = now
+            conto.default = False
+            # Come in `consolida`: un collegamento bancario appeso a un conto
+            # nascosto sincronizzerebbe movimenti che nessuno vede.
+            conto.bank_connector_provider = None
+            conto.bank_connector_account_id = None
+            conto.bank_connector_institution_id = None
+            conto.bank_connector_session_id = None
+            conto.bank_connector_last_error = None
+
+        # Resta l'unico conto: è lui il default, e non ha più da dove ricaricarsi.
+        target.default = True
+        if target.conto_sorgente_id in ids:
+            target.conto_sorgente_id = None
+            target.ricarica_automatica = False
+
+        # Movimenti spostati o nascosti fra conti: la base dei saldi cambia
+        # senza errori, quindi si riparte da qui (vedi services.verifica_saldi).
+        allinea_saldi_base_utente(db, current_user_id)
+
+        db.commit()
+        db.refresh(target)
+        return target
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while moving the transactions",
+        )
+
+
+@router.post("/{conto_id}/assorbi", response_model=ContoOut)
+def assorbi_conto_virtuale(
+    conto_id: int,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    """Porta su questo conto i movimenti rimasti sul conto virtuale.
+
+    È il seguito naturale di "ho aperto un conto vero": i movimenti registrati
+    prima, quando un conto non c'era, si leggono come "senza conto" e da qui si
+    assegnano a quello giusto.
+    """
+    target = (
+        db.query(Conto)
+        .filter(
+            Conto.id == conto_id,
+            Conto.user_id == current_user_id,
+            Conto.deleted_at.is_(None),
+        )
+        .first()
+    )
+
+    if not target:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Account not found or unauthorized",
+        )
+
+    if target.virtuale:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The virtual account cannot absorb itself",
+        )
+
+    virtuali = (
+        db.query(Conto)
+        .filter(
+            Conto.user_id == current_user_id,
+            Conto.deleted_at.is_(None),
+            Conto.virtuale.is_(True),
+        )
+        .all()
+    )
+
+    if not virtuali:
+        return target
+
+    try:
+        now = datetime.now(timezone.utc)
+
+        _sposta_su(db, current_user_id, [c.id for c in virtuali], target)
+
+        for conto in virtuali:
+            target.saldo += conto.saldo
+            conto.deleted_at = now
+
+        # Movimenti spostati o nascosti fra conti: la base dei saldi cambia
+        # senza errori, quindi si riparte da qui (vedi services.verifica_saldi).
+        allinea_saldi_base_utente(db, current_user_id)
+
+        db.commit()
+        db.refresh(target)
+        return target
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while moving the transactions",
+        )
+
+
+@router.post("/{conto_id}/restore", response_model=ContoOut)
+def restore_conto(
+    conto_id: int,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    """Ripristina un conto in soft-delete (e le transazioni nascoste insieme a esso).
+
+    Rete di sicurezza per le cancellazioni accidentali: non c'è una UI dedicata,
+    si invoca direttamente (es. dalla pagina /docs o via curl).
+    """
+    db_conto = (
+        db.query(Conto)
+        .filter(
+            Conto.id == conto_id,
+            Conto.user_id == current_user_id,
+            Conto.deleted_at.isnot(None),
+        )
+        .first()
+    )
+
+    if not db_conto:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Deleted account not found",
+        )
+
+    try:
+        # Ripristiniamo SOLO le transazioni nascoste nello stesso istante in cui il
+        # conto è stato cancellato (stesso timestamp), così non "resuscitiamo"
+        # righe nascoste da un'altra operazione.
+        deleted_marker = db_conto.deleted_at
+        db.query(Transazione).filter(
+            Transazione.conto_id == conto_id,
+            Transazione.user_id == current_user_id,
+            Transazione.deleted_at == deleted_marker,
+        ).update({"deleted_at": None}, synchronize_session=False)
+
+        db_conto.deleted_at = None
+
+        # Movimenti spostati o nascosti fra conti: la base dei saldi cambia
+        # senza errori, quindi si riparte da qui (vedi services.verifica_saldi).
+        allinea_saldi_base_utente(db, current_user_id)
+
+        db.commit()
+        db.refresh(db_conto)
+        return db_conto
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while restoring the account",
+        )
+
+
+def compute_current_month_budget(
+    db: Session,
+    current_user_id: int,
+    include_future_recurring: bool = False,
+):
+    """Risparmio del mese corrente: entrate - uscite - accantonamenti.
+
+    Funzione normale, senza `Depends`: la usano sia GET /conti/currentMonthExpenses
+    sia PUT /monthlyBudget, che deve restituire la card ricalcolata. Chiamare
+    direttamente l'endpoint da un altro router non funziona — i default sono
+    oggetti `Query`/`Depends`, non valori.
+    """
+    user = db.query(User).filter(User.id == current_user_id).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User session invalid or account not found",
+        )
+
+    # Calcolo del range del mese corrente
+    today = date.today()
+    first_day = today.replace(day=1)
+    # monthrange restituisce (giorno_settimana_inizio, numero_giorni_nel_mese)
+    _, last_day_num = calendar.monthrange(today.year, today.month)
+    last_day = today.replace(day=last_day_num)
+
+    # Un solo giro in SQL raggruppato per tipo, invece di una query per tipo.
+    # Lo scoping è su Transazione.user_id come in statistics/charts: la vecchia
+    # join su Conto faceva sparire dal solo budget le transazioni senza conto.
+    totals_by_tipo = dict(
+        db.query(Transazione.tipo, func.sum(importo_effettivo()))
+        .filter(
+            Transazione.user_id == current_user_id,
+            Transazione.deleted_at.is_(None),
+            Transazione.data >= first_day,
+            Transazione.data <= last_day,
+            Transazione.tipo.in_(
+                (
+                    TipoTransazione.ENTRATA.value,
+                    TipoTransazione.USCITA.value,
+                    TipoTransazione.ACCANTONAMENTO.value,
+                )
+            ),
+        )
+        .group_by(Transazione.tipo)
+        .all()
+    )
+
+    def _totale(tipo: TipoTransazione) -> Decimal:
+        return totals_by_tipo.get(tipo.value) or Decimal("0")
+
+    total_in = _totale(TipoTransazione.ENTRATA)
+    total_out = _totale(TipoTransazione.USCITA)
+    # Accantonamenti del mese: non sono spese, ma riducono il risparmio mensile
+    total_accantonamento = _totale(TipoTransazione.ACCANTONAMENTO)
+    # RIMBORSO e RICARICA restano fuori: il primo è già scontato da importo_netto
+    # sulla transazione padre, il secondo è un giroconto interno.
+
+    # Risparmio del mese: entrate - uscite - accantonamenti
+    remaining_amount = total_in - total_out - total_accantonamento
+
+    # Ricorrenze attive non ancora scattate entro fine mese. Servono sempre:
+    # l'hero della Home disegna il segmento "previsto" accanto allo speso, e il
+    # flag qui sotto le somma anche al risparmio.
+    def _recurring_total(tipo: TipoTransazione) -> Decimal:
+        return (
+            db.query(func.sum(Ricorrenza.importo))
+            .filter(
+                Ricorrenza.user_id == current_user_id,
+                Ricorrenza.tipo == tipo,
+                Ricorrenza.attiva,
+                Ricorrenza.prossima_esecuzione >= today,
+                Ricorrenza.prossima_esecuzione <= last_day,
+            )
+            .scalar()
+            or Decimal("0")
+        )
+
+    recurring_out = _recurring_total(TipoTransazione.USCITA)
+    recurring_in = _recurring_total(TipoTransazione.ENTRATA)
+
+    if include_future_recurring:
+        remaining_amount += recurring_in - recurring_out
+
+    percentage = None
+    if user.total_budget and user.total_budget > Decimal("0"):
+        # Calcolo percentuale del risparmio rispetto all'obiettivo
+        percentage = round(float(remaining_amount / user.total_budget * 100), 1)
+
+    # Tetto di spesa: concetto distinto dall'obiettivo di risparmio qui sopra.
+    # `remaining` può essere negativo — è lo sforamento, e l'hero lo mostra.
+    spending_budget = user.monthly_spending_budget
+    spending_percentage = None
+    spending_remaining = None
+    if spending_budget and spending_budget > Decimal("0"):
+        spending_percentage = round(float(total_out / spending_budget * 100), 1)
+        spending_remaining = spending_budget - total_out
+
+    return {
+        "monthly_budget": {
+            "total_budget": user.total_budget,
+            "remaining": remaining_amount,
+            "percentage": percentage,
+            "period": {"start": first_day, "end": last_day},
+        },
+        "spending": {
+            "budget": spending_budget,
+            "spent": total_out,
+            "projected": recurring_out,
+            "remaining": spending_remaining,
+            "percentage": spending_percentage,
+        },
+        "income": total_in,
+        "saved": total_accantonamento,
+    }
+
+
+@router.get("/currentMonthExpenses", response_model=CurrentMonthBudgetOut)
+def get_current_month_expenses(
+    include_future_recurring: bool = Query(
+        False,
+        description="Include future active recurring expenses within the current month",
+    ),
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    return compute_current_month_budget(db, current_user_id, include_future_recurring)
+
+
+@router.get("/expensesByCategory")
+def get_expenses_by_category(
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    today = date.today()
+    first_day = today.replace(day=1)
+
+    # Calcolo dell'ultimo giorno del mese corrente
+    _, last_day_num = calendar.monthrange(today.year, today.month)
+    last_day = today.replace(day=last_day_num)
+
+    # Aggregazione in SQL con lo stesso importo usato dal budget: sommare qui
+    # `importo_netto` nudo (NULL -> 0) faceva divergere la torta dalla card.
+    results = (
+        db.query(
+            Categoria.nome.label("categoria"),
+            func.sum(importo_effettivo()).label("totale"),
+        )
+        .outerjoin(Categoria, Transazione.categoria_id == Categoria.id)
+        .filter(
+            Transazione.user_id == current_user_id,
+            Transazione.deleted_at.is_(None),
+            Transazione.tipo == TipoTransazione.USCITA,
+            Transazione.data >= first_day,
+            Transazione.data <= last_day,  # Filtro per escludere transazioni future
+        )
+        .group_by(Categoria.nome)
+        .all()
+    )
+
+    # Le categorie interamente rimborsate (netto <= 0) restano fuori: una fetta
+    # negativa non è rappresentabile in un grafico a torta.
+    return [
+        {
+            "label": row.categoria or "Uncategorized",
+            "value": (row.totale or Decimal("0")).quantize(Decimal("0.01")),
+        }
+        for row in results
+        if (row.totale or Decimal("0")) > 0
+    ]

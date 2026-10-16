@@ -1,0 +1,92 @@
+from datetime import datetime
+from decimal import Decimal
+from fastapi import Query
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator  # Aggiornato a V2
+from typing import List, Literal, Optional
+from .sottocategoria import SottocategoriaCreate, SottocategoriaOut
+
+
+class CategoriaBase(BaseModel):
+    nome: str
+    solo_entrata: bool = True
+    solo_uscita: bool = True
+    # Tetto di spesa mensile desiderato. Nullo = nessun budget deciso.
+    budget_mensile: Optional[Decimal] = None
+
+    @field_validator("budget_mensile", mode="after")
+    @classmethod
+    def round_budget(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        return v.quantize(Decimal("0.01")) if v is not None else v
+
+
+class CategoriaCreate(CategoriaBase):
+    sottocategorie: Optional[List[SottocategoriaCreate]] = None
+
+
+class CategoriaUpdate(BaseModel):  # Rendo i campi opzionali per la PATCH
+    nome: Optional[str] = None
+    solo_entrata: Optional[bool] = None
+    solo_uscita: Optional[bool] = None
+    # Mandarlo a `null` toglie il budget: `exclude_unset` nel router distingue
+    # "non l'ho toccato" da "l'ho tolto".
+    budget_mensile: Optional[Decimal] = None
+
+    @field_validator("budget_mensile", mode="after")
+    @classmethod
+    def round_budget(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        return v.quantize(Decimal("0.01")) if v is not None else v
+
+
+class CategoriaOut(CategoriaBase):
+    id: int
+    creationDate: datetime
+    lastUpdate: datetime
+    lastImport: datetime
+    sottocategorie: List[SottocategoriaOut] = []
+
+    # Configurazione moderna Pydantic V2
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CategoriaFilters:
+    def __init__(
+        self,
+        # Default ordinamento per nome
+        sort_by: Optional[List[str]] = Query(["nome:asc"]),
+        nome: Optional[str] = Query(None),
+        solo_entrata: Optional[bool] = Query(None),
+        solo_uscita: Optional[bool] = Query(None),
+    ):
+        self.sort_by = sort_by
+        self.nome = nome
+        self.solo_entrata = solo_entrata
+        self.solo_uscita = solo_uscita
+
+    def model_dump(self):
+        return {k: v for k, v in self.__dict__.items() if v is not None}
+
+
+class CategoriaMigrate(BaseModel):
+    old_categoria_id: int
+    old_sottocategoria_id: Optional[int] = None
+    new_categoria_id: int
+    new_sottocategoria_id: Optional[int] = None
+    # Vincolo sull'origine: se indicato, si spostano solo i movimenti con
+    # questo tag. Assente = tutti, con o senza tag (comportamento storico).
+    old_tag_id: Optional[int] = None
+    # Cosa succede al tag dei movimenti spostati:
+    # - "keep": resta quello che avevano (default, comportamento storico);
+    # - "set":  diventa `new_tag_id`;
+    # - "clear": viene tolto.
+    # Tre stati espliciti perché un solo `new_tag_id` facoltativo non
+    # distinguerebbe "lascialo com'è" da "toglilo".
+    tag_action: Literal["keep", "set", "clear"] = "keep"
+    new_tag_id: Optional[int] = None
+
+    @model_validator(mode="after")
+    def check_new_tag(self):
+        if self.tag_action == "set" and self.new_tag_id is None:
+            raise ValueError("new_tag_id is required when tag_action is 'set'")
+        if self.tag_action != "set" and self.new_tag_id is not None:
+            raise ValueError("new_tag_id is only allowed when tag_action is 'set'")
+        return self

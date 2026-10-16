@@ -1,0 +1,179 @@
+import os
+import logging
+import uuid
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from apscheduler.schedulers.background import BackgroundScheduler
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
+from rate_limit import limiter
+from services import (
+    task_snapshot_patrimonio,
+    task_aggiornamento_prezzi,
+    task_transazioni_ricorrenti,
+    task_ricarica_automatica_conti,
+    task_sync_bank_connectors,
+    task_verifica_saldi,
+)
+from routers import (
+    auth,
+    conti,
+    categorie,
+    transazioni,
+    investimenti,
+    user,
+    sottocategorie,
+    tag,
+    debiti,
+    ricorrenze,
+    statistics,
+    charts,
+    bank_connectors,
+    bank_proposals,
+    open_banking,
+)
+
+logger = logging.getLogger(__name__)
+
+# Lo scheduler gira IN-PROCESS: se l'app viene avviata con più worker
+# (uvicorn/gunicorn --workers N) o scalata su più repliche, ogni processo ne
+# avvia una copia e i job cron partono N volte. Il gate qui sotto lo tiene
+# attivo di default (deploy a singolo worker) e va messo a "false" su tutte le
+# repliche tranne una.
+#
+# Come rete di sicurezza, i job che scrivono soldi (ricorrenze, ricarica
+# automatica) rileggono e bloccano ogni riga prima di toccarla (`FOR UPDATE SKIP
+# LOCKED` su Postgres): anche con il gate sbagliato non registrano due volte la
+# stessa occorrenza. Gli altri job sono idempotenti (snapshot, prezzi, verifica
+# saldi) o limitati dal provider (sync bancaria), quindi duplicarli spreca ma
+# non corrompe.
+RUN_SCHEDULER = os.getenv("RUN_SCHEDULER", "true").lower() in ("1", "true", "yes")
+
+scheduler = BackgroundScheduler()
+scheduler.add_job(task_aggiornamento_prezzi, "cron", hour=2, minute=0)
+scheduler.add_job(task_transazioni_ricorrenti, "cron", hour=3, minute=0)
+# Ogni notte riscrive la foto del mese in corso: quella che resta a fine mese
+# è l'ultima scattata, ed è quella che serve al confronto.
+scheduler.add_job(task_snapshot_patrimonio, "cron", hour=1, minute=30)
+scheduler.add_job(task_ricarica_automatica_conti, "cron", hour=4, minute=0)
+# Dopo ricorrenze e ricariche: controlla che ogni saldo torni con i movimenti.
+scheduler.add_job(task_verifica_saldi, "cron", hour=4, minute=30)
+# Ogni 6 ore (4 volte/giorno): le API AIS (PSD2) limitano gli accessi non
+# presidiati, quindi una sync oraria genera 429 "Too Many Requests".
+scheduler.add_job(task_sync_bank_connectors, "cron", hour="*/6")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    if RUN_SCHEDULER:
+        scheduler.start()
+        logger.info("Scheduler avviato su questo processo")
+    else:
+        logger.info("Scheduler disabilitato su questo processo (RUN_SCHEDULER=false)")
+    yield
+    # Shutdown
+    if RUN_SCHEDULER and scheduler.running:
+        scheduler.shutdown(wait=False)
+
+
+# In produzione la documentazione interattiva non va esposta: /docs e /openapi.json
+# regalano a chiunque la mappa completa degli endpoint. Il contratto resta comunque
+# generabile in locale (ENVIRONMENT != "production").
+IS_PRODUCTION = os.getenv("ENVIRONMENT", "development").lower() == "production"
+
+app = FastAPI(
+    title="Calcolatore Spese API",
+    servers=[{"url": "/", "description": "Default"}],
+    lifespan=lifespan,
+    docs_url=None if IS_PRODUCTION else "/docs",
+    redoc_url=None if IS_PRODUCTION else "/redoc",
+    openapi_url=None if IS_PRODUCTION else "/openapi.json",
+)
+
+# Rate limiting: senza, /login è aperto al brute force e /auth/forgot-password
+# può essere usato per inondare di email una casella. I limiti per-endpoint sono
+# dichiarati con @limiter.limit(...) sui router.
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+# Un'eccezione non gestita, senza questo blocco, viene raccolta dal
+# ServerErrorMiddleware di Starlette: risposta "Internal Server Error" in text/plain
+# e — soprattutto — SENZA header CORS, perché quel middleware sta più in alto di
+# CORSMiddleware. Il browser scarta la risposta, il frontend non legge nulla e può
+# solo dire "errore di connessione", perdendo la causa vera.
+#
+# Qui l'errore diventa un JSON con un `detail` leggibile e un `error_id` che compare
+# identico nei log: quando un utente segnala un errore, quel codice porta dritto alla
+# traceback corrispondente.
+#
+# ORDINE IMPORTANTE: questo middleware va registrato PRIMA di CORSMiddleware. Starlette
+# mette per ultimo il primo registrato, quindi così CORS resta più esterno e aggiunge i
+# suoi header anche alla risposta d'errore.
+@app.middleware("http")
+async def handle_unexpected_errors(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception:
+        error_id = uuid.uuid4().hex[:8]
+        logger.exception(
+            "Errore non gestito [%s] su %s %s",
+            error_id,
+            request.method,
+            request.url.path,
+        )
+        return JSONResponse(
+            status_code=500,
+            content={
+                # Messaggio in inglese come il resto dei `detail` dei router: la
+                # traduzione per l'utente la fa il frontend (i18n).
+                "detail": (
+                    f"Unexpected server error on {request.method} "
+                    f"{request.url.path} (reference {error_id})"
+                ),
+                "error_id": error_id,
+            },
+        )
+
+
+# Middleware CORS (rimane qui)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://conti.spassocasa.it", "http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Registrazione dei Router
+app.include_router(user.router)  # Gli endpoint di user (login/register)
+app.include_router(conti.router)  # Gli endpoint dei conti
+app.include_router(categorie.router)  # Categorie
+app.include_router(sottocategorie.router)  # Sottocategorie
+app.include_router(transazioni.router)  # Transazioni
+app.include_router(investimenti.router)  # Investimenti
+app.include_router(tag.router)  # Tag
+app.include_router(ricorrenze.router)  # Ricorrenze
+app.include_router(statistics.router)  # Statistiche
+app.include_router(charts.router)  # API Grafici
+app.include_router(bank_connectors.router)  # Connettore bancario
+app.include_router(bank_proposals.router)  # Proposte di transazione (tutte le pending)
+app.include_router(open_banking.router)  # Open Banking (GoCardless) requisition flow
+app.include_router(debiti.router)  # Debiti
+app.include_router(auth.router)  # Endpoint per forgot-password e reset-password
+
+
+@app.get("/")
+async def root():
+    return {"status": "online", "message": "Backend SpassoConti attivo"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="127.0.0.1", port=8000, log_level="info")

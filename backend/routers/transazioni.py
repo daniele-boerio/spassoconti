@@ -1,0 +1,1117 @@
+import csv
+import io
+import logging
+from typing import Annotated, Optional
+from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+from database import get_db
+import auth
+from schemas import (
+    TransazioneCreate,
+    TransazioneOut,
+    TransazionePagination,
+    TransazioneSplitRequest,
+    TransazioneUpdate,
+    TransazioneFilters,
+)
+from schemas.transazione import TipoTransazione
+from models import Conto, Transazione
+from services import (
+    apply_filters_and_sort,
+    importo_effettivo,
+    remember_last_tag,
+    saldo_dopo_transazione,
+    scala_residuo_debito,
+)
+from datetime import date, datetime, timezone
+from models import Categoria, Sottocategoria
+from sqlalchemy import func
+from decimal import Decimal
+from models import Debito, Tag
+
+router = APIRouter(prefix="/transazioni", tags=["Transazioni"])
+
+logger = logging.getLogger(__name__)
+
+# --- ENDPOINT TRANSAZIONI ---
+
+
+# Funzione di utilità per aggiornare le date delle categorie
+def update_category_usage(
+    db: Session, categoria_id: int = None, sottocategoria_id: int = None
+):
+    now = datetime.now(timezone.utc)
+    if categoria_id:
+        db.query(Categoria).filter(Categoria.id == categoria_id).update(
+            {"lastImport": now}
+        )
+    if sottocategoria_id:
+        db.query(Sottocategoria).filter(Sottocategoria.id == sottocategoria_id).update(
+            {"lastImport": now}
+        )
+
+
+# Funzione di utilità per aggiornare le date dei conti
+def update_conto_usage(db: Session, conto_id: int):
+    now = datetime.now(timezone.utc)
+    if conto_id:
+        db.query(Conto).filter(Conto.id == conto_id).update({"lastImport": now})
+
+
+def adjust_parent_netto(
+    db: Session, current_user_id: int, parent_id: int | None, delta: Decimal
+):
+    """Sposta di `delta` l'`importo_netto` della transazione padre di un rimborso.
+
+    `delta` negativo = rimborso applicato (il padre "vale" di meno), positivo =
+    rimborso stornato. Passare dal delta secco a storno+riapplica è l'unico modo
+    per reggere i cambi di `tipo` e di `parent_transaction_id`: con la vecchia
+    logica un rimborso trasformato in uscita lasciava il padre scontato per
+    sempre di un rimborso che non esisteva più.
+
+    La query è scopata sull'utente come tutte le altre: senza il filtro bastava
+    passare in PUT/DELETE il `parent_transaction_id` di una transazione altrui
+    per alterarne il netto.
+    """
+    if parent_id is None:
+        return
+
+    parent = (
+        db.query(Transazione)
+        .filter(
+            Transazione.id == parent_id,
+            Transazione.user_id == current_user_id,
+        )
+        .first()
+    )
+    if parent is None:
+        return
+
+    # Le righe anteriori alla migration che ha introdotto la colonna hanno il
+    # netto a NULL: il netto di partenza è il lordo.
+    if parent.importo_netto is None:
+        parent.importo_netto = parent.importo
+
+    parent.importo_netto += delta
+    db.add(parent)  # forza SQLAlchemy a tracciare la modifica
+
+
+def resolve_tassonomia(
+    db: Session,
+    current_user_id: int,
+    categoria_id: int | None,
+    sottocategoria_id: int | None,
+    tag_id: int | None,
+):
+    """Carica categoria/sottocategoria/tag verificando che siano dell'utente.
+
+    Questi tre id arrivano dal client come i conti: vanno verificati con lo stesso
+    rigore, altrimenti una transazione può referenziare la tassonomia di un altro
+    utente (e l'autocompilazione della descrizione ne esporrebbe il nome).
+    Restituisce le righe già scopate così i chiamanti non le rileggono senza filtro.
+    """
+    categoria = None
+    sottocategoria = None
+    tag = None
+
+    if categoria_id is not None:
+        categoria = (
+            db.query(Categoria)
+            .filter(Categoria.id == categoria_id, Categoria.user_id == current_user_id)
+            .first()
+        )
+        if not categoria:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Category not found or not authorized",
+            )
+
+    if sottocategoria_id is not None:
+        sottocategoria = (
+            db.query(Sottocategoria)
+            .filter(
+                Sottocategoria.id == sottocategoria_id,
+                Sottocategoria.user_id == current_user_id,
+            )
+            .first()
+        )
+        if not sottocategoria:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Subcategory not found or not authorized",
+            )
+
+    if tag_id is not None:
+        tag = (
+            db.query(Tag)
+            .filter(Tag.id == tag_id, Tag.user_id == current_user_id)
+            .first()
+        )
+        if not tag:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Tag not found or not authorized",
+            )
+
+    return categoria, sottocategoria, tag
+
+
+def _transazione_per_chiave(
+    db: Session, user_id: int, idempotency_key: Optional[str]
+) -> Optional[Transazione]:
+    if not idempotency_key:
+        return None
+    return (
+        db.query(Transazione)
+        .filter(
+            Transazione.user_id == user_id,
+            Transazione.idempotency_key == idempotency_key,
+        )
+        .first()
+    )
+
+
+@router.post("", response_model=TransazioneOut)
+def create_transazione(
+    transazione: TransazioneCreate,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+    # Scelta dal client, una per salvataggio: se la stessa richiesta arriva due
+    # volte (rete caduta dopo il commit, coda offline che riprova) la seconda
+    # riceve la transazione già creata invece di crearne un doppione.
+    idempotency_key: Annotated[
+        Optional[str], Header(alias="Idempotency-Key", max_length=64)
+    ] = None,
+):
+    gia_creata = _transazione_per_chiave(db, current_user_id, idempotency_key)
+    if gia_creata is not None:
+        return gia_creata
+
+    # 1. Recuperiamo il conto
+    conto = (
+        db.query(Conto)
+        .filter(
+            Conto.id == transazione.conto_id,
+            Conto.user_id == current_user_id,
+            Conto.deleted_at.is_(None),
+        )
+        .first()
+    )
+
+    if not conto:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Account not found or not authorized",
+        )
+
+    # Categoria/sottocategoria/tag: verificati come il conto, prima di usarli
+    categoria_row, sottocategoria_row, _tag_row = resolve_tassonomia(
+        db,
+        current_user_id,
+        transazione.categoria_id,
+        transazione.sottocategoria_id,
+        transazione.tag_id,
+    )
+
+    # --- RICARICA (giroconto): serve un conto destinazione valido e diverso ---
+    # --- ACCANTONAMENTO: conto destinazione OPZIONALE (salvadanaio), ma se c'è
+    #     dev'essere valido e diverso dal sorgente. ---
+    conto_dest = None
+    if transazione.tipo == TipoTransazione.RICARICA:
+        if not transazione.conto_destinazione_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A transfer requires a destination account",
+            )
+        if transazione.conto_destinazione_id == transazione.conto_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Source and destination accounts must differ",
+            )
+        conto_dest = (
+            db.query(Conto)
+            .filter(
+                Conto.id == transazione.conto_destinazione_id,
+                Conto.user_id == current_user_id,
+                Conto.deleted_at.is_(None),
+            )
+            .first()
+        )
+        if not conto_dest:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Destination account not found or not authorized",
+            )
+    elif (
+        transazione.tipo == TipoTransazione.ACCANTONAMENTO
+        and transazione.conto_destinazione_id
+    ):
+        if transazione.conto_destinazione_id == transazione.conto_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Source and destination accounts must differ",
+            )
+        conto_dest = (
+            db.query(Conto)
+            .filter(
+                Conto.id == transazione.conto_destinazione_id,
+                Conto.user_id == current_user_id,
+                Conto.deleted_at.is_(None),
+            )
+            .first()
+        )
+        if not conto_dest:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Destination account not found or not authorized",
+            )
+
+    # Inizializziamo variabili per il padre
+    parent_trans = None
+
+    # 2. Controllo RIMBORSO (Refund)
+    if (
+        transazione.tipo == TipoTransazione.RIMBORSO
+        and transazione.parent_transaction_id
+    ):
+        parent_trans = (
+            db.query(Transazione)
+            .filter(
+                Transazione.id == transazione.parent_transaction_id,
+                Transazione.user_id == current_user_id,
+            )
+            .first()
+        )
+
+        if not parent_trans:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The original transaction for this refund does not exist",
+            )
+
+    try:
+        # 3. Creazione record
+        trans_data = transazione.model_dump()
+
+        if parent_trans:
+            trans_data["categoria_id"] = parent_trans.categoria_id
+            trans_data["sottocategoria_id"] = parent_trans.sottocategoria_id
+            trans_data["tag_id"] = parent_trans.tag_id
+
+        # --- NUOVA LOGICA: AUTOCOMPILAZIONE DESCRIZIONE ---
+        # Usiamo le righe già caricate da resolve_tassonomia (scopate sull'utente):
+        # rileggerle per id senza filtro esporrebbe il nome della tassonomia altrui.
+        desc_text = trans_data.get("descrizione")
+        # Se non c'è descrizione o è solo composta da spazi vuoti
+        if not desc_text or not str(desc_text).strip():
+            if sottocategoria_row:
+                trans_data["descrizione"] = sottocategoria_row.nome
+            elif categoria_row:
+                trans_data["descrizione"] = categoria_row.nome
+        # ----------------------------------------------------
+
+        # Inizializziamo importo_netto per la transazione corrente
+        trans_data["importo_netto"] = transazione.importo
+
+        new_trans = Transazione(
+            **trans_data,
+            user_id=current_user_id,
+            idempotency_key=idempotency_key,
+        )
+        db.add(new_trans)
+
+        # Il rimborso scala il netto del padre
+        if parent_trans:
+            adjust_parent_netto(
+                db,
+                current_user_id,
+                parent_trans.id,
+                -Decimal(str(transazione.importo)),
+            )
+
+        # 4. Aggiornamento Saldo (Balance Update)
+        if transazione.tipo in (
+            TipoTransazione.RICARICA,
+            TipoTransazione.ACCANTONAMENTO,
+        ):
+            # Giroconto/accantonamento: i soldi escono dalla sorgente. Per la
+            # RICARICA il conto destinazione c'è sempre; per l'ACCANTONAMENTO
+            # è opzionale (salvadanaio): se presente, lo accreditiamo.
+            conto.saldo -= transazione.importo
+            if conto_dest:
+                conto_dest.saldo += transazione.importo
+                db.add(conto_dest)
+        else:
+            # Il rimborso aumenta il saldo del conto (come un'entrata)
+            modificatore = (
+                Decimal("-1")
+                if transazione.tipo == TipoTransazione.USCITA
+                else Decimal("1")
+            )
+            conto.saldo += transazione.importo * modificatore
+
+        # --- GESTIONE DEBITO (se fornito) ---
+        if getattr(transazione, "debito_id", None):
+            db_debito = (
+                db.query(Debito)
+                .filter(
+                    Debito.id == transazione.debito_id,
+                    Debito.user_id == current_user_id,
+                )
+                .first()
+            )
+            if not db_debito:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Referenced debito not found",
+                )
+
+            # Sottrai l'importo dal residuo del debito; non andare sotto zero
+            scala_residuo_debito(db_debito, transazione.importo)
+            db.add(db_debito)
+        # --------------------------------------
+
+        # AGGIORNAMENTO lastImport / Usage
+        update_category_usage(db, new_trans.categoria_id, new_trans.sottocategoria_id)
+        update_conto_usage(db, transazione.conto_id)
+
+        # Il tag appena scelto diventa il default del prossimo inserimento.
+        # Solo quando l'ha scelto davvero l'utente: il giroconto il campo tag non
+        # ce l'ha (lo forziamo a NULL) e il rimborso eredita quello del padre —
+        # farli scrivere il default lo cambierebbe alle spalle dell'utente.
+        if transazione.tipo != TipoTransazione.RICARICA and not parent_trans:
+            remember_last_tag(db, current_user_id, new_trans.tag_id)
+
+        db.commit()
+        db.refresh(new_trans)
+        return new_trans
+
+    except HTTPException:
+        db.rollback()
+        raise
+    except IntegrityError:
+        db.rollback()
+        # Due richieste con la stessa chiave arrivate insieme: la prima ha
+        # vinto l'indice unico, questa restituisce quello che ha creato.
+        gia_creata = _transazione_per_chiave(db, current_user_id, idempotency_key)
+        if gia_creata is not None:
+            return gia_creata
+        logger.exception("Errore creazione transazione")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while creating the transaction",
+        )
+    except Exception:
+        db.rollback()
+        # Log dell'errore per debugging interno
+        logger.exception("Errore creazione transazione")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while creating the transaction",
+        )
+
+
+@router.post("/{transazione_id}/split", response_model=list[TransazioneOut])
+def split_transazione(
+    transazione_id: int,
+    split_request: TransazioneSplitRequest,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    original = (
+        db.query(Transazione)
+        .filter(
+            Transazione.id == transazione_id,
+            Transazione.user_id == current_user_id,
+            Transazione.deleted_at.is_(None),
+        )
+        .first()
+    )
+
+    if not original:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Original transaction not found",
+        )
+
+    if original.tipo == TipoTransazione.RIMBORSO or original.parent_transaction_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Refund transactions cannot be split",
+        )
+
+    if original.split_group_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Split transactions cannot be split again",
+        )
+
+    if original.debito_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Transactions linked to debt cannot be split",
+        )
+
+    if (
+        db.query(Transazione)
+        .filter(Transazione.parent_transaction_id == original.id)
+        .count()
+        > 0
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Transactions with refunds cannot be split",
+        )
+
+    total_parts = sum(part.importo for part in split_request.parts)
+    if total_parts != original.importo:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Sum of split parts must equal original transaction amount",
+        )
+
+    for part in split_request.parts:
+        if part.importo <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each split part must have a positive amount",
+            )
+        if part.debito_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Split parts cannot reference debt",
+            )
+        # Ogni parte porta la propria tassonomia: va verificata come nel create
+        resolve_tassonomia(
+            db,
+            current_user_id,
+            part.categoria_id,
+            part.sottocategoria_id,
+            part.tag_id,
+        )
+
+    split_transactions = []
+    for part in split_request.parts:
+        new_trans = Transazione(
+            importo=part.importo,
+            importo_netto=part.importo,
+            tipo=original.tipo,
+            data=original.data,
+            descrizione=part.descrizione or original.descrizione,
+            conto_id=original.conto_id,
+            categoria_id=part.categoria_id,
+            sottocategoria_id=part.sottocategoria_id,
+            tag_id=part.tag_id,
+            user_id=current_user_id,
+            split_group_id=original.id,
+        )
+        db.add(new_trans)
+        split_transactions.append(new_trans)
+
+    db.delete(original)
+
+    try:
+        db.commit()
+        for transaction in split_transactions:
+            db.refresh(transaction)
+        return split_transactions
+    except Exception as e:
+        db.rollback()
+        logger.exception("Errore split transazione")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while splitting the transaction",
+        )
+
+
+@router.get("/paginated", response_model=TransazionePagination)
+def get_transazioni(
+    page: int = 1,
+    size: int = 10,
+    filters: TransazioneFilters = Depends(),
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    offset = (page - 1) * size
+
+    # 1. Query base filtrata
+    base_query = db.query(Transazione).filter(Transazione.user_id == current_user_id)
+    base_query = apply_filters_and_sort(base_query, Transazione, filters)
+
+    # 2. Calcolo Totale Record (count ignora l'order_by automaticamente)
+    total = base_query.count()
+
+    # 3. Totali per tipo, sull'importo EFFETTIVO.
+    #
+    # `importo_effettivo()` e non `Transazione.importo`: è la regola che vale
+    # per ogni altro aggregato dell'app (budget, statistiche, grafici), e questi
+    # totali sono un aggregato come gli altri. Sommando il lordo, una spesa da
+    # 100 rimborsata di 30 restava "100" qui e "70" sulla Home — lo stesso mese,
+    # due cifre diverse sotto la stessa parola.
+    #
+    # Il rimborso sta già dentro al netto del padre, quindi NON va sommato una
+    # seconda volta a parte: chi legge questi totali calcola il saldo come
+    # entrate meno uscite, senza rimetterci i rimborsi (che altrimenti
+    # conterebbero due volte). `total_rimborsi` resta come informazione — quanto
+    # è tornato indietro — non come addendo.
+    #
+    # `.order_by(None)` toglie l'ordinamento, che su un aggregato darebbe
+    # GroupingError.
+    def _totale(tipo: TipoTransazione) -> Decimal:
+        return (
+            base_query.filter(Transazione.tipo == tipo)
+            .order_by(None)
+            .with_entities(func.sum(importo_effettivo()))
+            .scalar()
+            or Decimal("0.00")
+        )
+
+    total_entrata = _totale(TipoTransazione.ENTRATA)
+    total_uscita = _totale(TipoTransazione.USCITA)
+    total_rimborsi = _totale(TipoTransazione.RIMBORSO)
+
+    # 5. Recupero dati paginati (qui l'ordinamento serve e rimane quello di base_query)
+    data = base_query.offset(offset).limit(size).all()
+
+    return {
+        "total": total,
+        "page": page,
+        "size": size,
+        "total_entrata": total_entrata,
+        "total_uscita": total_uscita,
+        "total_rimborsi": total_rimborsi,
+        "data": data,
+    }
+
+
+# Intestazioni del CSV: in italiano, perché lo apre l'utente in Excel/Numbers.
+COLONNE_EXPORT = [
+    "Data",
+    "Tipo",
+    "Importo",
+    "Importo netto",
+    "Descrizione",
+    "Conto",
+    "Conto destinazione",
+    "Categoria",
+    "Sottocategoria",
+    "Tag",
+]
+
+
+def _cella_testo(valore: Optional[str]) -> str:
+    """Testo libero sicuro per un foglio di calcolo.
+
+    Una descrizione che inizia con = + - @ verrebbe eseguita come formula
+    all'apertura (CSV injection): l'apostrofo la fa leggere come testo.
+    """
+    if not valore:
+        return ""
+    testo = str(valore)
+    return "'" + testo if testo[0] in "=+-@\t\r" else testo
+
+
+def _cella_importo(valore: Optional[Decimal]) -> str:
+    # Virgola decimale: con il separatore ";" è il formato che Excel in
+    # italiano apre già come numero.
+    if valore is None:
+        return ""
+    return f"{Decimal(valore).quantize(Decimal('0.01'))}".replace(".", ",")
+
+
+@router.get("/export")
+def export_transazioni(
+    filters: TransazioneFilters = Depends(),
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    """I movimenti filtrati come CSV, con gli stessi filtri della lista.
+
+    Separatore ";" e virgola decimale (Excel in italiano), BOM UTF-8 così gli
+    accenti si leggono anche in Excel. I nomi di conti e tassonomia si leggono
+    una volta per tabella, non una per riga.
+    """
+    query = db.query(Transazione).filter(Transazione.user_id == current_user_id)
+    query = apply_filters_and_sort(query, Transazione, filters)
+    righe = query.all()
+
+    def nomi(model):
+        return {
+            r.id: r.nome
+            for r in db.query(model.id, model.nome)
+            .filter(model.user_id == current_user_id)
+            .all()
+        }
+
+    conti = nomi(Conto)
+    categorie = nomi(Categoria)
+    sottocategorie = nomi(Sottocategoria)
+    tags = nomi(Tag)
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, delimiter=";", lineterminator="\r\n")
+    writer.writerow(COLONNE_EXPORT)
+
+    for t in righe:
+        writer.writerow(
+            [
+                t.data.isoformat() if t.data else "",
+                t.tipo,
+                _cella_importo(t.importo),
+                _cella_importo(
+                    t.importo_netto if t.importo_netto is not None else t.importo
+                ),
+                _cella_testo(t.descrizione),
+                _cella_testo(conti.get(t.conto_id)),
+                _cella_testo(conti.get(t.conto_destinazione_id)),
+                _cella_testo(categorie.get(t.categoria_id)),
+                _cella_testo(sottocategorie.get(t.sottocategoria_id)),
+                _cella_testo(tags.get(t.tag_id)),
+            ]
+        )
+
+    nome_file = f"movimenti_{date.today().isoformat()}.csv"
+    return Response(
+        content="\ufeff" + buffer.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{nome_file}"'},
+    )
+
+
+@router.get("/{transazione_id}", response_model=TransazioneOut)
+def get_transazione(
+    transazione_id: int,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    """Una transazione sola, col saldo del conto subito dopo.
+
+    Il dettaglio di un movimento è l'unico posto in cui quel numero serve, ed
+    è anche l'unico in cui si può calcolare senza far pagare a una lista una
+    somma progressiva per riga.
+    """
+    transazione = (
+        db.query(Transazione)
+        .filter(
+            Transazione.id == transazione_id,
+            Transazione.user_id == current_user_id,
+            Transazione.deleted_at.is_(None),
+        )
+        .first()
+    )
+
+    if not transazione:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Transaction not found",
+        )
+
+    return TransazioneOut.model_validate(
+        transazione, from_attributes=True
+    ).model_copy(
+        update={
+            "saldo_dopo": saldo_dopo_transazione(db, transazione, current_user_id)
+        }
+    )
+
+
+@router.get("", response_model=list[TransazioneOut])
+def get_recent_transazioni(
+    filters: TransazioneFilters = Depends(),
+    n: int = None,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    query = db.query(Transazione).filter(Transazione.user_id == current_user_id)
+
+    query = apply_filters_and_sort(query, Transazione, filters)
+
+    if n:
+        query = query.limit(n)
+
+    return query.all()
+
+
+@router.put("/{transazione_id}", response_model=TransazioneOut)
+def update_transazione(
+    transazione_id: int,
+    transazione_data: TransazioneUpdate,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    # 1. Recupero la transazione originale
+    db_trans = (
+        db.query(Transazione)
+        .filter(
+            Transazione.id == transazione_id,
+            Transazione.user_id == current_user_id,
+            Transazione.deleted_at.is_(None),
+        )
+        .first()
+    )
+
+    if not db_trans:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    # 2. Recupero il CONTO DI ORIGINE (quello vecchio)
+    conto_vecchio = (
+        db.query(Conto)
+        .filter(Conto.id == db_trans.conto_id, Conto.user_id == current_user_id)
+        .first()
+    )
+
+    # Salviamo i vecchi valori per il calcolo delle differenze
+    old_importo = db_trans.importo
+    old_debito_id = db_trans.debito_id
+    old_tipo = db_trans.tipo
+    old_conto_dest_id = db_trans.conto_destinazione_id
+    old_parent_id = db_trans.parent_transaction_id
+
+    # Una transazione padre di sé stessa manderebbe in tilt lo storno del netto
+    # (si applicherebbe il delta addosso). Meglio fermarsi qui.
+    if transazione_data.parent_transaction_id == transazione_id:
+        raise HTTPException(
+            status_code=400,
+            detail="A transaction cannot be the parent of itself",
+        )
+
+    try:
+        # Salviamo importo netto vecchio (o importo se None)
+        old_importo_netto = (
+            db_trans.importo_netto
+            if db_trans.importo_netto is not None
+            else db_trans.importo
+        )
+
+        # A. STORNO del vecchio movimento
+        if old_tipo in (TipoTransazione.RICARICA, TipoTransazione.ACCANTONAMENTO):
+            # Giroconto/accantonamento: la sorgente riprende i soldi, l'eventuale
+            # destinazione li perde
+            if conto_vecchio:
+                conto_vecchio.saldo += old_importo
+            if old_conto_dest_id:
+                old_dest = (
+                    db.query(Conto)
+                    .filter(
+                        Conto.id == old_conto_dest_id,
+                        Conto.user_id == current_user_id,
+                    )
+                    .first()
+                )
+                if old_dest:
+                    old_dest.saldo -= old_importo
+                    db.add(old_dest)
+        else:
+            mod_vecchio = (
+                Decimal("1")
+                if old_tipo == TipoTransazione.USCITA
+                else Decimal("-1")
+            )
+            if conto_vecchio:
+                conto_vecchio.saldo += old_importo * mod_vecchio
+
+        # B. AGGIORNAMENTO DATI
+        update_data = transazione_data.model_dump(exclude_unset=True)
+
+        # La tassonomia in arrivo va verificata PRIMA di scriverla sulla transazione.
+        # Usiamo i valori risultanti (payload se presente, altrimenti quelli attuali)
+        # così l'autocompilazione lavora sempre su righe di proprietà dell'utente.
+        categoria_row, sottocategoria_row, _tag_row = resolve_tassonomia(
+            db,
+            current_user_id,
+            update_data.get("categoria_id", db_trans.categoria_id),
+            update_data.get("sottocategoria_id", db_trans.sottocategoria_id),
+            update_data.get("tag_id", db_trans.tag_id),
+        )
+
+        for key, value in update_data.items():
+            setattr(db_trans, key, value)
+
+        # --- AUTOCOMPILAZIONE DESCRIZIONE ANCHE IN MODIFICA ---
+        if not db_trans.descrizione or not str(db_trans.descrizione).strip():
+            if sottocategoria_row:
+                db_trans.descrizione = sottocategoria_row.nome
+            elif categoria_row:
+                db_trans.descrizione = categoria_row.nome
+        # ------------------------------------------------------
+
+        db.flush()
+
+        # --- PROPAGAZIONE CATEGORIA/SOTTOCATEGORIA AI RIMBORSI ---
+        # Cerchiamo tutti i rimborsi che hanno questa transazione come "padre"
+        rimborsi_figli = (
+            db.query(Transazione)
+            .filter(
+                Transazione.parent_transaction_id == db_trans.id,
+                Transazione.user_id == current_user_id,
+            )
+            .all()
+        )
+
+        # Allineiamo categoria, sottocategoria e tag ai figli
+        for rimborso in rimborsi_figli:
+            rimborso.categoria_id = db_trans.categoria_id
+            rimborso.sottocategoria_id = db_trans.sottocategoria_id
+            rimborso.tag_id = db_trans.tag_id
+            db.add(rimborso)
+        # ---------------------------------------------------------
+
+        # --- AGGIORNAMENTO IMPORTO NETTO ---
+        new_importo = Decimal(str(db_trans.importo))
+        diff_importo = new_importo - old_importo
+
+        # Il netto della riga stessa segue la variazione del lordo, così gli
+        # eventuali rimborsi già scontati restano scontati.
+        db_trans.importo_netto = old_importo_netto + diff_importo
+
+        # Effetto sul PADRE: stessa strategia di saldo e residuo del debito,
+        # cioè storno del vecchio movimento e applicazione del nuovo. Applicare
+        # solo `diff_importo` al padre corrente reggeva un cambio di importo, ma
+        # non un cambio di `tipo` (il vecchio padre restava scontato a vita) né
+        # uno spostamento del rimborso su un altro padre (il vecchio non veniva
+        # ripristinato e il nuovo veniva scontato della sola differenza).
+        era_rimborso = (
+            old_tipo == TipoTransazione.RIMBORSO and old_parent_id is not None
+        )
+        e_rimborso = (
+            db_trans.tipo == TipoTransazione.RIMBORSO
+            and db_trans.parent_transaction_id is not None
+        )
+
+        if era_rimborso:
+            adjust_parent_netto(db, current_user_id, old_parent_id, old_importo)
+        if e_rimborso:
+            adjust_parent_netto(
+                db, current_user_id, db_trans.parent_transaction_id, -new_importo
+            )
+
+        # C. Recupero il CONTO DI DESTINAZIONE (potrebbe essere lo stesso o uno nuovo)
+        conto_nuovo = (
+            db.query(Conto)
+            .filter(
+                Conto.id == db_trans.conto_id,
+                Conto.user_id == current_user_id,
+                Conto.deleted_at.is_(None),
+            )
+            .first()
+        )
+
+        if not conto_nuovo:
+            raise HTTPException(
+                status_code=404, detail="New associated account not found"
+            )
+
+        # D. APPLICAZIONE del nuovo movimento
+        if db_trans.tipo in (
+            TipoTransazione.RICARICA,
+            TipoTransazione.ACCANTONAMENTO,
+        ):
+            conto_dest_nuovo = None
+            if db_trans.conto_destinazione_id:
+                if db_trans.conto_destinazione_id == db_trans.conto_id:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Source and destination accounts must differ",
+                    )
+                conto_dest_nuovo = (
+                    db.query(Conto)
+                    .filter(
+                        Conto.id == db_trans.conto_destinazione_id,
+                        Conto.user_id == current_user_id,
+                        Conto.deleted_at.is_(None),
+                    )
+                    .first()
+                )
+                if not conto_dest_nuovo:
+                    raise HTTPException(
+                        status_code=404,
+                        detail="Destination account not found or unauthorized",
+                    )
+            elif db_trans.tipo == TipoTransazione.RICARICA:
+                # Il giroconto richiede sempre una destinazione; l'accantonamento no.
+                raise HTTPException(
+                    status_code=400,
+                    detail="A transfer requires a different destination account",
+                )
+            conto_nuovo.saldo -= db_trans.importo
+            if conto_dest_nuovo:
+                conto_dest_nuovo.saldo += db_trans.importo
+                db.add(conto_dest_nuovo)
+        else:
+            mod_nuovo = (
+                Decimal("-1")
+                if db_trans.tipo == TipoTransazione.USCITA
+                else Decimal("1")
+            )
+            conto_nuovo.saldo += db_trans.importo * mod_nuovo
+
+        # D-bis. RESIDUO DEBITO: storna il vecchio effetto e applica il nuovo,
+        # così cambi di importo (o di debito) restano coerenti col residuo.
+        def _adjust_debito_residuo(debito_id, delta):
+            if debito_id is None:
+                return
+            debito = (
+                db.query(Debito)
+                .filter(Debito.id == debito_id, Debito.user_id == current_user_id)
+                .first()
+            )
+            if debito is None:
+                return
+            if debito.residuo is None:
+                debito.residuo = debito.ammontare
+            nuovo = debito.residuo + delta
+            if nuovo < Decimal("0"):
+                nuovo = Decimal("0.00")
+            if debito.ammontare is not None and nuovo > debito.ammontare:
+                nuovo = debito.ammontare
+            debito.residuo = nuovo
+            db.add(debito)
+
+        # Reverse del vecchio (restituisce l'importo pagato), apply del nuovo (sottrae)
+        _adjust_debito_residuo(old_debito_id, old_importo)
+        _adjust_debito_residuo(db_trans.debito_id, -db_trans.importo)
+
+        # E. AGGIORNAMENTO lastImport (usiamo i nuovi ID se sono cambiati)
+        update_category_usage(db, db_trans.categoria_id, db_trans.sottocategoria_id)
+        update_conto_usage(db, db_trans.conto_id)
+
+        db.commit()
+        db.refresh(db_trans)
+        return db_trans
+
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update transaction: {str(e)}",
+        )
+
+
+@router.delete("/{transazione_id}")
+def delete_transazione(
+    transazione_id: int,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    db_trans = (
+        db.query(Transazione)
+        .filter(
+            Transazione.id == transazione_id,
+            Transazione.user_id == current_user_id,
+            Transazione.deleted_at.is_(None),
+        )
+        .first()
+    )
+
+    if not db_trans:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found"
+        )
+
+    # Se sto cancellando un RIMBORSO, devo ripristinare l'importo netto del PADRE
+    # Nota: lo facciamo prima del commit finale, ma dopo aver verificato che la transazione esiste
+    if db_trans.tipo == TipoTransazione.RIMBORSO and db_trans.parent_transaction_id:
+        # Cancellando il rimborso, il padre "recupera" quel valore nel netto
+        adjust_parent_netto(
+            db, current_user_id, db_trans.parent_transaction_id, db_trans.importo
+        )
+
+    conto = (
+        db.query(Conto)
+        .filter(Conto.id == db_trans.conto_id, Conto.user_id == current_user_id)
+        .first()
+    )
+
+    if not conto:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Associated account not found"
+        )
+
+    try:
+        # Balance reversion
+        if db_trans.tipo in (
+            TipoTransazione.RICARICA,
+            TipoTransazione.ACCANTONAMENTO,
+        ):
+            # Giroconto/accantonamento: la sorgente riprende i soldi, l'eventuale
+            # destinazione li perde
+            conto.saldo += db_trans.importo
+            if db_trans.conto_destinazione_id:
+                conto_dest = (
+                    db.query(Conto)
+                    .filter(
+                        Conto.id == db_trans.conto_destinazione_id,
+                        Conto.user_id == current_user_id,
+                    )
+                    .first()
+                )
+                if conto_dest:
+                    conto_dest.saldo -= db_trans.importo
+                    db.add(conto_dest)
+        elif db_trans.tipo == TipoTransazione.USCITA:
+            conto.saldo += db_trans.importo
+        else:
+            conto.saldo -= db_trans.importo
+
+        # Se la transazione era collegata a un debito, ripristina il residuo
+        # (operazione inversa di create/pay), senza superare l'ammontare totale.
+        if db_trans.debito_id is not None:
+            db_debito = (
+                db.query(Debito)
+                .filter(
+                    Debito.id == db_trans.debito_id,
+                    Debito.user_id == current_user_id,
+                )
+                .first()
+            )
+            if db_debito is not None:
+                if db_debito.residuo is None:
+                    db_debito.residuo = db_debito.ammontare
+                nuovo_residuo = db_debito.residuo + db_trans.importo
+                if (
+                    db_debito.ammontare is not None
+                    and nuovo_residuo > db_debito.ammontare
+                ):
+                    nuovo_residuo = db_debito.ammontare
+                db_debito.residuo = nuovo_residuo
+                db.add(db_debito)
+
+        # Se questa transazione è il PADRE di rimborsi, alla cancellazione i figli
+        # vengono eliminati in cascata: prima dobbiamo stornare il loro effetto
+        # sul saldo (ognuno sul proprio conto), altrimenti il saldo resta sfasato.
+        figli_rimborsi = (
+            db.query(Transazione)
+            .filter(
+                Transazione.parent_transaction_id == db_trans.id,
+                Transazione.user_id == current_user_id,
+            )
+            .all()
+        )
+        for figlio in figli_rimborsi:
+            conto_figlio = (
+                db.query(Conto)
+                .filter(
+                    Conto.id == figlio.conto_id,
+                    Conto.user_id == current_user_id,
+                )
+                .first()
+            )
+            if conto_figlio is not None:
+                if figlio.tipo == TipoTransazione.USCITA:
+                    conto_figlio.saldo += figlio.importo
+                else:
+                    conto_figlio.saldo -= figlio.importo
+
+        db.delete(db_trans)
+        db.commit()
+        return {"message": "Transaction successfully deleted and balance updated"}
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while deleting the transaction",
+        )

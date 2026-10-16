@@ -1,0 +1,524 @@
+from sqlalchemy import (
+    Column,
+    Integer,
+    Numeric,
+    String,
+    DateTime,
+    ForeignKey,
+    Boolean,
+    Date,
+    Index,
+    UniqueConstraint,
+)
+from sqlalchemy.orm import relationship, backref
+from datetime import datetime, timezone
+from database import Base
+from decimal import Decimal
+
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=False, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    # Obiettivo di risparmio mensile: quanto l'utente punta a mettere da parte.
+    total_budget = Column(Numeric(10, 2), nullable=True)
+    # Tetto di spesa mensile: quanto l'utente si concede di spendere. Concetto
+    # distinto da total_budget — è il riferimento dell'hero della Home
+    # ("speso X su un budget di Y, restano Z").
+    monthly_spending_budget = Column(Numeric(10, 2), nullable=True)
+    # Ultimo tag scelto creando una transazione: precompila il form del prossimo
+    # inserimento. NULL non è "non impostato" ma "nessun default": salvare una
+    # transazione senza tag lo azzera, ed è così che si disattiva la precompilazione.
+    last_tag_id = Column(
+        Integer, ForeignKey("tags.id", ondelete="SET NULL"), nullable=True
+    )
+
+    conti = relationship(
+        "Conto",
+        cascade="all, delete-orphan",
+        order_by="desc(Conto.creationDate), desc(Conto.lastUpdate), Conto.id",
+    )
+    investimenti = relationship(
+        "Investimento",
+        cascade="all, delete-orphan",
+        order_by="desc(Investimento.creationDate), desc(Investimento.lastUpdate), Investimento.id",
+    )
+
+    reset_token = Column(String, nullable=True, index=True)
+    reset_token_expiration = Column(DateTime, nullable=True)
+    token_version = Column(Integer, default=1, nullable=False)
+
+
+class RefreshToken(Base):
+    """Sessione persistente di un singolo dispositivo.
+
+    Il token vive in un cookie httpOnly: qui ne salviamo solo l'hash SHA-256, così
+    un dump del DB non permette di impersonare nessuno. Ogni uso ruota il token
+    dentro la stessa `family_id`; se un token già ruotato viene riproposto vuol dire
+    che è stato copiato, e revochiamo l'intera famiglia (reuse detection).
+    """
+
+    __tablename__ = "refresh_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash = Column(String(64), nullable=False, unique=True, index=True)
+    family_id = Column(String(43), nullable=False, index=True)
+
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    # Valorizzati quando il token viene ruotato o revocato: un token con
+    # `used_at` o `revoked_at` non è più spendibile.
+    used_at = Column(DateTime, nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
+
+    user_agent = Column(String, nullable=True)
+
+    user = relationship("User")
+
+    # Niente `creationDate`/`lastUpdate` qui (a differenza delle entità di dominio):
+    # il ciclo di vita del token è già coperto da created_at/used_at/revoked_at, e la
+    # migration a7c1f2d3e4b5 non crea quelle colonne.
+    __table_args__ = (Index("ix_refresh_tokens_user_family", "user_id", "family_id"),)
+
+
+class Conto(Base):
+    __tablename__ = "conti"
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String, nullable=False)
+    saldo = Column(Numeric(10, 2), nullable=False, default=0.0)
+
+    # --- Nuovi campi per Satispay-style ---
+    ricarica_automatica = Column(Boolean, default=False)
+    budget_obiettivo = Column(Numeric(10, 2), nullable=True)
+    soglia_minima = Column(Numeric(10, 2), nullable=True)
+    conto_sorgente_id = Column(Integer, ForeignKey("conti.id"), nullable=True)
+    frequenza_controllo = Column(String, nullable=True)  # "SETTIMANALE" o "MENSILE"
+    prossimo_controllo = Column(
+        Date, nullable=True
+    )  # Quando effettuare il prossimo check
+
+    color = Column(String, nullable=True, default="4b6cb7")
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+
+    transazioni = relationship(
+        "Transazione",
+        # Transazione ha due FK verso conti (conto_id e conto_destinazione_id):
+        # qui ci interessano solo le transazioni "del conto" come sorgente.
+        foreign_keys="Transazione.conto_id",
+        cascade="all, delete-orphan",
+        order_by="desc(Transazione.data), desc(Transazione.creationDate), desc(Transazione.lastUpdate), Transazione.id",
+    )
+
+    default = Column(Boolean, default=False)
+
+    # Conto aperto dall'app, non dall'utente: il "Portafoglio" di chi non vuole
+    # modellare i propri conti. Resta invisibile finché è l'unico, e i movimenti
+    # che ci stanno sopra si leggono come "senza conto".
+    virtuale = Column(Boolean, nullable=False, default=False)
+
+    # corrente / salvadanaio / prepagata: decide la forma della card in elenco.
+    tipo = Column(String, nullable=True)
+
+    creationDate = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    lastUpdate = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+    lastImport = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    # Soft-delete: quando valorizzato il conto è "cancellato" (nascosto ovunque)
+    # ma resta nel DB, ripristinabile via POST /conti/{id}/restore. Le sue
+    # transazioni vengono marcate con lo stesso meccanismo. NON facciamo mai
+    # più il DELETE fisico del conto (che via ON DELETE CASCADE distruggeva
+    # irreversibilmente tutte le transazioni).
+    deleted_at = Column(DateTime, nullable=True, index=True)
+
+    # Base del saldo: saldo meno l'effetto di tutti i movimenti attivi. Le
+    # operazioni sui movimenti la lasciano invariata per costruzione; cambia
+    # solo quando l'utente corregge il saldo a mano. Se il ricalcolo notturno
+    # la trova spostata, qualche percorso ha mosso il saldo senza un movimento
+    # (o un movimento senza il saldo): è il segnale di un saldo andato fuori
+    # sincrono. NULL = non ancora fotografata.
+    saldo_base = Column(Numeric(10, 2), nullable=True)
+
+    bank_connector_provider = Column(String, nullable=True)
+    bank_connector_account_id = Column(String, nullable=True)
+    bank_connector_institution_id = Column(String, nullable=True)
+    bank_connector_client_id = Column(String, nullable=True)
+    bank_connector_secret = Column(String, nullable=True)
+    bank_connector_access_token = Column(String, nullable=True)
+    bank_connector_refresh_token = Column(String, nullable=True)
+    bank_connector_last_sync = Column(DateTime, nullable=True)
+    bank_connector_last_error = Column(String, nullable=True)
+    # Open Banking (Enable Banking) link flow: the session id of a completed link,
+    # and the pending auth `state` matched on the callback handshake.
+    bank_connector_session_id = Column(String, nullable=True)
+    bank_connector_auth_state = Column(String, nullable=True)
+
+
+class BankTransactionProposal(Base):
+    __tablename__ = "bank_transaction_proposals"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    conto_id = Column(Integer, ForeignKey("conti.id", ondelete="CASCADE"))
+    provider = Column(String, nullable=False)
+    external_id = Column(String, nullable=True, index=True)
+    tipo = Column(String, nullable=False)
+    data = Column(Date, nullable=False)
+    importo = Column(Numeric(10, 2), nullable=False)
+    descrizione = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="PENDING")
+    imported_transaction_id = Column(
+        Integer, ForeignKey("transazioni.id"), nullable=True
+    )
+
+    creationDate = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    lastUpdate = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
+class Categoria(Base):
+    __tablename__ = "categorie"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+
+    solo_entrata = Column(Boolean, default=True)
+    solo_uscita = Column(Boolean, default=True)
+
+    # Quanto si vorrebbe spendere in un mese su questa categoria. Nullo vuol
+    # dire che un budget non è stato deciso: zero sarebbe "non spenderci
+    # niente", che è un'altra cosa e va poter essere detta.
+    budget_mensile = Column(Numeric(10, 2), nullable=True)
+
+    # Una categoria ha più sottocategorie
+    sottocategorie = relationship(
+        "Sottocategoria",
+        cascade="all, delete-orphan",
+        order_by="Sottocategoria.creationDate, Sottocategoria.lastUpdate, Sottocategoria.id",
+    )
+
+    creationDate = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    lastUpdate = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+    lastImport = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class Sottocategoria(Base):
+    __tablename__ = "sottocategorie"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String, nullable=False)
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    # Si riferisce a una sola categoria
+    categoria_id = Column(Integer, ForeignKey("categorie.id", ondelete="CASCADE"))
+
+    solo_entrata = Column(Boolean, default=True)
+    solo_uscita = Column(Boolean, default=True)
+
+    creationDate = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    lastUpdate = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+    lastImport = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class Tag(Base):
+    __tablename__ = "tags"
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+
+    # Si riferisce a diverse transazioni
+    transazioni = relationship(
+        "Transazione",
+        order_by="desc(Transazione.data), desc(Transazione.creationDate), desc(Transazione.lastUpdate), Transazione.id",
+    )
+
+    creationDate = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    lastUpdate = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
+class Debito(Base):
+    __tablename__ = "debiti"
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String, nullable=False)
+    ammontare = Column(Numeric(10, 2), nullable=False)
+    residuo = Column(Numeric(10, 2), nullable=False)
+    descrizione = Column(String, nullable=True)
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    conto_id = Column(
+        Integer, ForeignKey("conti.id", ondelete="SET NULL"), nullable=True
+    )
+
+    transazioni = relationship(
+        "Transazione",
+        order_by="desc(Transazione.data), desc(Transazione.creationDate), desc(Transazione.lastUpdate), Transazione.id",
+    )
+
+    creationDate = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    lastUpdate = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
+class Transazione(Base):
+    __tablename__ = "transazioni"
+    id = Column(Integer, primary_key=True, index=True)
+    importo = Column(Numeric(10, 2), nullable=False)
+    tipo = Column(
+        String, nullable=False
+    )  # "ENTRATA", "USCITA", "RIMBORSO", "RICARICA" o "ACCANTONAMENTO"
+    data = Column(Date)
+    descrizione = Column(String)
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    conto_id = Column(Integer, ForeignKey("conti.id", ondelete="CASCADE"))
+    # Conto destinatario del giroconto (solo per tipo RICARICA)
+    conto_destinazione_id = Column(
+        Integer, ForeignKey("conti.id", ondelete="SET NULL"), nullable=True
+    )
+    categoria_id = Column(
+        Integer, ForeignKey("categorie.id", ondelete="SET NULL"), nullable=True
+    )
+    sottocategoria_id = Column(
+        Integer, ForeignKey("sottocategorie.id", ondelete="SET NULL"), nullable=True
+    )
+    tag_id = Column(Integer, ForeignKey("tags.id", ondelete="SET NULL"), nullable=True)
+    debito_id = Column(
+        Integer, ForeignKey("debiti.id", ondelete="SET NULL"), nullable=True
+    )
+
+    # per i rimborsi, collega la transazione al padre
+    parent_transaction_id = Column(
+        Integer, ForeignKey("transazioni.id", ondelete="CASCADE"), nullable=True
+    )
+
+    rimborsi = relationship(
+        "Transazione",
+        backref=backref("parent_transaction", remote_side=[id]),
+        cascade="all, delete-orphan",
+    )
+
+    split_group_id = Column(Integer, nullable=True)
+
+    importo_netto = Column(Numeric(10, 2), nullable=True)
+
+    # Chiave scelta dal client per ogni salvataggio. Se la stessa richiesta
+    # arriva due volte (rete caduta dopo il commit, coda offline che riprova),
+    # la seconda restituisce la transazione già creata invece di duplicarla.
+    idempotency_key = Column(String(64), nullable=True)
+
+    # Soft-delete: marcata insieme al conto quando quest'ultimo viene "cancellato".
+    # Tutte le letture/aggregati escludono le transazioni con deleted_at valorizzato.
+    deleted_at = Column(DateTime, nullable=True, index=True)
+
+    debito = relationship("Debito")
+
+    # Relazioni
+    categoria = relationship(
+        "Categoria",
+        order_by="desc(Categoria.creationDate), desc(Categoria.lastUpdate), Categoria.id",
+    )
+    sottocategoria = relationship(
+        "Sottocategoria",
+        order_by="desc(Sottocategoria.creationDate), desc(Sottocategoria.lastUpdate), Sottocategoria.id",
+    )
+
+    creationDate = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    lastUpdate = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
+class Investimento(Base):
+    __tablename__ = "investimenti"
+    id = Column(Integer, primary_key=True, index=True)
+    isin = Column(String, index=True, nullable=False)
+    ticker = Column(String, index=True, nullable=True)
+    nome_titolo = Column(String)
+    user_id = Column(Integer, ForeignKey("users.id"))
+
+    prezzo_attuale = Column(Numeric(18, 6), nullable=True)
+    data_ultimo_aggiornamento = Column(Date, nullable=True)
+
+    # Ordinamento cronologico per calcoli, ma visualizzazione desc per la lista
+    storico = relationship(
+        "StoricoInvestimento",
+        cascade="all, delete-orphan",
+        order_by="StoricoInvestimento.data",
+    )
+
+    creationDate = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    lastUpdate = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    # --- PROPRIETÀ CALCOLATE ---
+    @property
+    def quantita_totale(self):
+        return sum((s.quantita for s in self.storico), Decimal("0"))
+
+    @property
+    def prezzo_medio_carico(self):
+        acquisti = [s for s in self.storico if s.quantita > 0]
+        if not acquisti:
+            return Decimal("0")
+        totale_speso = sum(
+            (s.quantita * s.prezzo_unitario for s in acquisti), Decimal("0")
+        )
+        totale_quantita = sum((s.quantita for s in acquisti), Decimal("0"))
+        return (
+            (totale_speso / totale_quantita).quantize(Decimal("0.000001"))
+            if totale_quantita > 0
+            else Decimal("0")
+        )
+
+    @property
+    def valore_posizione(self):
+        if not self.prezzo_attuale:
+            return Decimal("0")
+        return (self.quantita_totale * self.prezzo_attuale).quantize(Decimal("0.01"))
+
+
+class StoricoInvestimento(Base):
+    __tablename__ = "storico_investimenti"
+    id = Column(Integer, primary_key=True, index=True)
+    investimento_id = Column(Integer, ForeignKey("investimenti.id", ondelete="CASCADE"))
+    data = Column(Date, nullable=False)
+    quantita = Column(Numeric(18, 6))
+    prezzo_unitario = Column(Numeric(18, 6))
+    valore_attuale = Column(Numeric(18, 2))
+
+    creationDate = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    lastUpdate = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
+class PatrimonioSnapshot(Base):
+    """Quanto valevi alla fine di un mese.
+
+    Il saldo dei conti si potrebbe ricostruire dalle transazioni; il valore di
+    mercato dei titoli no, perché lo storico degli investimenti tiene le
+    operazioni e non i prezzi giorno per giorno. Per poter dire "rispetto al
+    mese scorso" la foto va scattata quando il mese finisce.
+    """
+
+    __tablename__ = "patrimonio_snapshots"
+    __table_args__ = (
+        UniqueConstraint("user_id", "anno", "mese", name="uq_patrimonio_utente_mese"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+
+    anno = Column(Integer, nullable=False)
+    mese = Column(Integer, nullable=False)
+
+    conti = Column(Numeric(12, 2), nullable=False, default=0)
+    titoli = Column(Numeric(12, 2), nullable=False, default=0)
+
+    creationDate = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class Ricorrenza(Base):
+    __tablename__ = "ricorrenze"
+    id = Column(Integer, primary_key=True, index=True)
+    importo = Column(Numeric(10, 2), nullable=False)
+    nome = Column(String, nullable=False)
+    tipo = Column(String, nullable=False)  # "ENTRATA", "USCITA" o "RIMBORSO"
+    frequenza = Column(
+        String, nullable=False
+    )  # GIORNALIERA, SETTIMANALE, MENSILE, ANNUALE
+    prossima_esecuzione = Column(Date, nullable=False)  # La data in cui dovrà scattare
+    attiva = Column(Boolean, default=True)
+
+    # Chiavi esterne (template per la transazione futura)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    conto_id = Column(Integer, ForeignKey("conti.id"))
+    categoria_id = Column(
+        Integer, ForeignKey("categorie.id", ondelete="SET NULL"), nullable=True
+    )
+    sottocategoria_id = Column(
+        Integer, ForeignKey("sottocategorie.id", ondelete="SET NULL"), nullable=True
+    )
+    tag_id = Column(Integer, ForeignKey("tags.id", ondelete="SET NULL"), nullable=True)
+
+    # Fine della ricorrenza: dopo questa data non scatta più. NULL = senza fine.
+    data_fine = Column(Date, nullable=True)
+    # Quante occorrenze mancano (rate di un finanziamento). Scende a ogni
+    # esecuzione; a zero la ricorrenza si sospende. NULL = illimitate.
+    rate_rimanenti = Column(Integer, nullable=True)
+    # Importo che cambia ogni volta (bollette): lo scheduler non la registra da
+    # sé, resta "da confermare" finché l'utente non scrive l'importo vero.
+    importo_variabile = Column(Boolean, nullable=False, default=False)
+    # Rata di un debito: ogni esecuzione scala il residuo, e a debito estinto la
+    # ricorrenza si sospende.
+    debito_id = Column(
+        Integer, ForeignKey("debiti.id", ondelete="SET NULL"), nullable=True
+    )
+
+    creationDate = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    lastUpdate = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
+# --- Indici di performance -------------------------------------------------
+# Ogni query è user-scoped (`.filter(Model.user_id == ...)`): senza indice su
+# user_id il DB fa un full scan che cresce con TUTTI i dati di TUTTI gli utenti.
+# Sulla tabella più grande (transazioni) l'indice composito (user_id, data)
+# copre anche il range/ordinamento per data della lista paginata; conto_id
+# accelera i filtri per conto e i ricalcoli di saldo.
+Index("ix_conti_user_id", Conto.user_id)
+Index("ix_categorie_user_id", Categoria.user_id)
+Index("ix_sottocategorie_user_id", Sottocategoria.user_id)
+Index("ix_sottocategorie_categoria_id", Sottocategoria.categoria_id)
+Index("ix_tags_user_id", Tag.user_id)
+Index("ix_debiti_user_id", Debito.user_id)
+Index("ix_investimenti_user_id", Investimento.user_id)
+Index("ix_ricorrenze_user_id", Ricorrenza.user_id)
+Index("ix_bank_proposals_user_id", BankTransactionProposal.user_id)
+Index("ix_transazioni_user_id_data", Transazione.user_id, Transazione.data)
+Index("ix_transazioni_conto_id", Transazione.conto_id)
+Index(
+    "ux_transazioni_user_idempotency",
+    Transazione.user_id,
+    Transazione.idempotency_key,
+    unique=True,
+)

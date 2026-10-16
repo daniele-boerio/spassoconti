@@ -1,0 +1,307 @@
+import os
+import logging
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from sqlalchemy.orm import Session
+from database import get_db
+from routers.conti import compute_current_month_budget
+from services import ensure_default_conto
+import auth
+from fastapi.security import OAuth2PasswordRequestForm
+from models import User
+from schemas import (
+    Token,
+    UserCreate,
+    UserBudgetUpdate,
+    UserResponse,
+    UserUpdate,
+    CurrentMonthBudgetOut,
+)
+from rate_limit import limiter
+
+router = APIRouter(tags=["User"])
+
+logger = logging.getLogger(__name__)
+
+# Hash bcrypt di una password fittizia. Serve a far pagare a un login con utente
+# inesistente lo stesso costo di uno con utente reale: senza, il tempo di risposta
+# rivela quali account esistono.
+_DUMMY_PASSWORD_HASH = auth.get_password_hash("dummy-password-for-timing-safety")
+
+# --- ENDPOINT UTENTI ---
+
+
+@router.post("/register", response_model=Token)
+@limiter.limit("5/hour")
+def register_user(
+    user: UserCreate,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    # Controllo campi obbligatori
+    if not user.username or not user.password or not user.email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing fields. Please provide username, email, and password",
+        )
+
+    # Normalizzazione input
+    email_lower = user.email.lower()
+    username_lower = user.username.lower()
+
+    # 1. Controllo duplicati
+    if db.query(User).filter(User.email == email_lower).first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The email address you entered is already associated with an account",
+        )
+
+    if db.query(User).filter(User.username == username_lower).first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The username you selected is not available",
+        )
+
+    # 2. Creazione Utente
+    try:
+        hashed_pwd = auth.get_password_hash(user.password)
+        new_user = User(
+            email=email_lower,
+            username=username_lower,
+            hashed_password=hashed_pwd,
+        )
+
+        db.add(new_user)
+        db.flush()
+
+        # Un utente nuovo deve poter registrare una spesa subito, senza prima
+        # inventarsi un conto: gliene apriamo uno noi (vedi ensure_default_conto).
+        ensure_default_conto(db, new_user.id)
+
+        db.commit()
+        db.refresh(new_user)
+
+        # Come il login: il nuovo utente parte già con la sessione del dispositivo
+        raw_refresh = auth.issue_refresh_token(
+            db, new_user.id, user_agent=request.headers.get("user-agent")
+        )
+        db.commit()
+        auth.set_refresh_cookie(response, raw_refresh)
+
+        access_token = auth.create_access_token(
+            data={
+                "user_id": new_user.id,
+                "token_version": getattr(new_user, "token_version", 1),
+            }
+        )
+
+        return {"access_token": access_token, "username": new_user.username}
+    except HTTPException:
+        # Un errore già "parlante" (400/409/...) non va mascherato da 500 generico.
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        # Senza questo log l'unica traccia di cosa sia andato storto è il messaggio
+        # generico restituito al client: la causa reale sparisce.
+        logger.exception(
+            "Registrazione fallita per email=%s username=%s",
+            email_lower,
+            username_lower,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while creating your account. Please try again later",
+        )
+
+
+@router.post("/login", response_model=Token)
+@limiter.limit("10/minute;50/hour")
+def login(
+    request: Request,
+    response: Response,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
+    if not form_data.username or not form_data.password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username and password are required",
+        )
+
+    # Il campo si chiama "username" in OAuth2PasswordRequestForm, ma può contenere sia username che email
+    login_identifier = form_data.username.lower()
+
+    # Cerchiamo l'utente sia per username che per email usando or_
+    from sqlalchemy import or_
+
+    user = (
+        db.query(User)
+        .filter(or_(User.username == login_identifier, User.email == login_identifier))
+        .first()
+    )
+
+    # Utente inesistente e password errata devono essere indistinguibili, sia nel
+    # messaggio sia nel tempo di risposta: altrimenti /login diventa un oracolo per
+    # scoprire quali email/username sono registrati. Se l'utente non c'è, verifichiamo
+    # comunque la password contro un hash fittizio per pagare lo stesso costo bcrypt.
+    if user:
+        password_ok = auth.verify_password(form_data.password, user.hashed_password)
+    else:
+        auth.verify_password(form_data.password, _DUMMY_PASSWORD_HASH)
+        password_ok = False
+
+    if not password_ok:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+        )
+
+    # Sessione persistente del dispositivo: refresh token in cookie httpOnly.
+    # Qui le credenziali sono già state validate: se fallisce, il problema è la
+    # creazione della sessione, e il messaggio deve dirlo invece di far sembrare
+    # il login stesso rotto (vedi `/auth/refresh`, stessa gestione).
+    try:
+        raw_refresh = auth.issue_refresh_token(
+            db, user.id, user_agent=request.headers.get("user-agent")
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "Login: creazione della sessione fallita per user_id=%s", user.id
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Credentials are valid but the device session could not be created. Please try again",
+        )
+
+    auth.set_refresh_cookie(response, raw_refresh)
+
+    # Inseriamo la token_version nel JWT per validarla successivamente
+    access_token = auth.create_access_token(
+        data={"user_id": user.id, "token_version": user.token_version}
+    )
+
+    return {"access_token": access_token, "username": user.username}
+
+
+@router.get("/me", response_model=UserResponse)
+def get_me(
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    user = db.query(User).filter(User.id == current_user_id).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found. Your session may have expired",
+        )
+
+    admin_email = os.getenv("OPEN_BANKING_ADMIN_EMAIL")
+    is_open_banking_admin = bool(
+        admin_email and user.email.lower() == admin_email.strip().lower()
+    )
+
+    response = UserResponse.model_validate(user)
+    response.is_open_banking_admin = is_open_banking_admin
+    return response
+
+
+@router.put("/me", response_model=UserResponse)
+def update_me(
+    payload: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    """Cambia lo username dal profilo.
+
+    Le stesse regole della registrazione: minuscolo e unico. Il token resta
+    valido — l'identità è l'id, non il nome.
+    """
+    username = payload.username.strip().lower()
+
+    if not username:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing fields. Please provide a username",
+        )
+
+    user = db.query(User).filter(User.id == current_user_id).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found. Your session may have expired",
+        )
+
+    if username != user.username:
+        taken = (
+            db.query(User)
+            .filter(User.username == username, User.id != current_user_id)
+            .first()
+        )
+        if taken:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The username you selected is not available",
+            )
+
+    try:
+        user.username = username
+        db.commit()
+        db.refresh(user)
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while updating the profile",
+        )
+
+    return get_me(db=db, current_user_id=current_user_id)
+
+
+@router.put("/monthlyBudget", response_model=CurrentMonthBudgetOut)
+def update_monthly_budget(
+    budget_data: UserBudgetUpdate,
+    include_future_recurring: bool = Query(
+        False,
+        description="Include future active recurring expenses within the current month",
+    ),
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    user = db.query(User).filter(User.id == current_user_id).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User account not found"
+        )
+
+    try:
+        # Aggiornamento parziale: obiettivo di risparmio e tetto di spesa si
+        # impostano da due controlli separati, quindi un payload con solo uno dei
+        # due non deve azzerare l'altro. Passare esplicitamente `null` invece sì.
+        for field, value in budget_data.model_dump(exclude_unset=True).items():
+            setattr(user, field, value)
+        db.commit()
+
+        # Restituiamo i dati aggiornati. Il flag va ripassato: la risposta
+        # sostituisce la card del mese nello store del FE, e ricalcolarla col
+        # default direbbe "senza ricorrenti future" a chi la spunta ce l'ha.
+        return compute_current_month_budget(
+            db, current_user_id, include_future_recurring
+        )
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "Aggiornamento del budget mensile fallito per user_id=%s", current_user_id
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update monthly budget",
+        )
