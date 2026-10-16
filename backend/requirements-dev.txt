@@ -6,3 +6,5 @@
 # di autenticazione (tests/test_auth_flow.py) per esercitare i cookie veri.
 pytest==9.1.1
 httpx==0.28.1
+# Copertura: pytest -q --cov=. --cov-report=term-missing
+pytest-cov==7.1.0

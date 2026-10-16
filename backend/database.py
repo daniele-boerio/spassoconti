@@ -14,8 +14,11 @@ host = os.getenv("DB_HOST")
 port = os.getenv("DB_PORT")
 database = os.getenv("DB_NAME")
 
-# Componi l'URL in modo dinamico
-SQLALCHEMY_DATABASE_URL = f"postgresql://{user}:{password}@{host}:{port}/{database}"
+# Componi l'URL in modo dinamico. DATABASE_URL, se c'è, vince: serve agli E2E
+# (scripts/e2e_server.py, SQLite usa e getta). In produzione non è impostata.
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL") or (
+    f"postgresql://{user}:{password}@{host}:{port}/{database}"
+)
 
 # pool_pre_ping: dopo un riavvio di Postgres le connessioni nel pool sono morte, e
 # senza il ping la prima richiesta su ciascuna andrebbe in 500.
