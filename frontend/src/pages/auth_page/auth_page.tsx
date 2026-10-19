@@ -1,10 +1,18 @@
 import React, { useState } from "react";
-import { login, register } from "../../features/profile/api_calls";
+import {
+  login,
+  register,
+  verifyTwoFactor,
+} from "../../features/profile/api_calls";
 import Button from "../../components/button/button";
 import "./auth_page.scss";
 import { useAppDispatch, useAppSelector } from "../../store/store";
 import { useI18n } from "../../i18n/use-i18n";
-import { selectProfileLoading } from "../../features/profile/profile_slice";
+import {
+  cancelTwoFactor,
+  selectMfaToken,
+  selectProfileLoading,
+} from "../../features/profile/profile_slice";
 import ForgotPasswordDialog from "../../components/dialog/forgot_password_dialog/forgot_password_dialog";
 
 export default function AuthPage() {
@@ -18,7 +26,11 @@ export default function AuthPage() {
   const [forgotOpen, setForgotOpen] = useState(false);
 
   const loading = useAppSelector(selectProfileLoading);
+  const mfaToken = useAppSelector(selectMfaToken);
   const dispatch = useAppDispatch();
+
+  // Password giusta, account con la verifica in due passaggi: manca il codice.
+  if (mfaToken) return <TwoFactorStep mfaToken={mfaToken} />;
 
   const submit = async (event?: React.FormEvent) => {
     event?.preventDefault();
@@ -132,6 +144,82 @@ export default function AuthPage() {
   );
 }
 
+/**
+ * Secondo passo dell'accesso: il codice a 6 cifre dell'app di autenticazione,
+ * o uno dei codici di recupero se il telefono non c'è.
+ */
+function TwoFactorStep({ mfaToken }: { mfaToken: string }) {
+  const { t } = useI18n();
+  const dispatch = useAppDispatch();
+  const loading = useAppSelector(selectProfileLoading);
+
+  const [code, setCode] = useState("");
+  const [recovery, setRecovery] = useState(false);
+
+  const submit = async (event?: React.FormEvent) => {
+    event?.preventDefault();
+    await dispatch(verifyTwoFactor({ mfa_token: mfaToken, code: code.trim() }));
+  };
+
+  // Un codice dell'app ha 6 cifre; uno di recupero 10 caratteri (+ trattino).
+  const canSubmit = recovery ? code.trim().length >= 10 : /^\d{6}$/.test(code.trim());
+
+  return (
+    <div className="auth">
+      <form className="auth__form" onSubmit={submit}>
+        <div className="auth__intro">
+          <span className="auth__logo" aria-hidden="true">
+            <i className="ph-bold ph-shield-check" />
+          </span>
+
+          <h1 className="auth__title">{t("two_factor_title")}</h1>
+          <p className="auth__subtitle">
+            {recovery ? t("two_factor_login_recovery_hint") : t("two_factor_login_hint")}
+          </p>
+        </div>
+
+        <div className="auth__fields">
+          <Field
+            id="auth-code"
+            label={recovery ? t("two_factor_recovery_code") : t("two_factor_code")}
+            icon="ph-bold ph-key"
+            // "one-time-code": iOS propone il codice dall'app Password.
+            autoComplete={recovery ? "off" : "one-time-code"}
+            inputMode={recovery ? "text" : "numeric"}
+            value={code}
+            placeholder={recovery ? "a1b2c-3d4e5" : "123456"}
+            onChange={setCode}
+            autoFocus
+          />
+
+          <button
+            type="button"
+            className="auth__forgot"
+            onClick={() => {
+              setRecovery((current) => !current);
+              setCode("");
+            }}
+          >
+            {recovery ? t("two_factor_use_app") : t("two_factor_use_recovery")}
+          </button>
+        </div>
+
+        <div className="auth__actions">
+          <Button type="submit" block disabled={!canSubmit || loading}>
+            {t("two_factor_verify")}
+          </Button>
+
+          <p className="auth__switch">
+            <button type="button" onClick={() => dispatch(cancelTwoFactor())}>
+              {t("back")}
+            </button>
+          </p>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 type FieldProps = {
   id: string;
   label: string;
@@ -140,6 +228,8 @@ type FieldProps = {
   placeholder?: string;
   type?: string;
   autoComplete?: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+  autoFocus?: boolean;
   onChange: (value: string) => void;
   /** Bottone a destra dentro al campo (l'occhio della password). */
   trailing?: React.ReactNode;
@@ -153,6 +243,8 @@ function Field({
   placeholder,
   type = "text",
   autoComplete,
+  inputMode,
+  autoFocus,
   onChange,
   trailing,
 }: FieldProps) {
@@ -171,6 +263,8 @@ function Field({
           value={value}
           placeholder={placeholder}
           autoComplete={autoComplete}
+          inputMode={inputMode}
+          autoFocus={autoFocus}
           onChange={(event) => onChange(event.target.value)}
         />
 

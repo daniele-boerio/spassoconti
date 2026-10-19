@@ -50,6 +50,79 @@ class User(Base):
     reset_token_expiration = Column(DateTime, nullable=True)
     token_version = Column(Integer, default=1, nullable=False)
 
+    # --- Verifica in due passaggi (TOTP) ---
+    # Il segreto è cifrato (auth.cifra_segreto_totp): un dump del DB non basta a
+    # generare i codici. Esiste già durante la configurazione, ma vale solo
+    # quando `totp_enabled` è vero, cioè dopo che l'utente ha confermato un codice.
+    totp_secret = Column(String, nullable=True)
+    totp_enabled = Column(Boolean, nullable=False, default=False)
+    # Ultimo intervallo di 30 s accettato: lo stesso codice non vale due volte.
+    totp_last_step = Column(Integer, nullable=True)
+
+    # --- Notifiche push: cosa vuole ricevere l'utente ---
+    notifica_budget = Column(Boolean, nullable=False, default=True)
+    notifica_ricorrenze = Column(Boolean, nullable=False, default=True)
+
+
+class RecoveryCode(Base):
+    """Codice di recupero della verifica in due passaggi: vale una volta sola.
+
+    In DB solo l'hash, come per i refresh token: sono 40 bit casuali, non
+    attaccabili a dizionario come una password.
+    """
+
+    __tablename__ = "recovery_codes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    code_hash = Column(String(64), nullable=False)
+    used_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+
+
+class PushSubscription(Base):
+    """Un dispositivo (browser o app sulla Home) che riceve le notifiche push.
+
+    `endpoint` è l'URL del servizio push del browser (Apple, Google, Mozilla):
+    identifica il dispositivo, quindi è unico. Se lo stesso telefono passa a un
+    altro account, la riga cambia proprietario invece di duplicarsi.
+    """
+
+    __tablename__ = "push_subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    endpoint = Column(String, nullable=False, unique=True)
+    p256dh = Column(String, nullable=False)
+    auth = Column(String, nullable=False)
+    user_agent = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+
+
+class NotificaInviata(Base):
+    """Ricorda le notifiche già mandate, per non ripeterle.
+
+    `chiave` dice di cosa si tratta, es. "budget:cat:12:2026-10:over": il job dei
+    budget gira ogni mezz'ora, ma ogni soglia di ogni mese si notifica una volta.
+    """
+
+    __tablename__ = "notifiche_inviate"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    chiave = Column(String, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "chiave", name="uq_notifiche_inviate_user_chiave"),
+    )
+
 
 class RefreshToken(Base):
     """Sessione persistente di un singolo dispositivo.

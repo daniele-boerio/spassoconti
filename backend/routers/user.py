@@ -157,33 +157,18 @@ def login(
             detail="Invalid credentials",
         )
 
+    # Verifica in due passaggi: la password giusta non basta. Niente sessione né
+    # cookie, solo un token a 5 minuti da ripresentare col codice a
+    # POST /auth/2fa/verify.
+    if user.totp_enabled:
+        return {
+            "username": user.username,
+            "mfa_required": True,
+            "mfa_token": auth.create_mfa_token(user),
+        }
+
     # Sessione persistente del dispositivo: refresh token in cookie httpOnly.
-    # Qui le credenziali sono già state validate: se fallisce, il problema è la
-    # creazione della sessione, e il messaggio deve dirlo invece di far sembrare
-    # il login stesso rotto (vedi `/auth/refresh`, stessa gestione).
-    try:
-        raw_refresh = auth.issue_refresh_token(
-            db, user.id, user_agent=request.headers.get("user-agent")
-        )
-        db.commit()
-    except Exception:
-        db.rollback()
-        logger.exception(
-            "Login: creazione della sessione fallita per user_id=%s", user.id
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Credentials are valid but the device session could not be created. Please try again",
-        )
-
-    auth.set_refresh_cookie(response, raw_refresh)
-
-    # Inseriamo la token_version nel JWT per validarla successivamente
-    access_token = auth.create_access_token(
-        data={"user_id": user.id, "token_version": user.token_version}
-    )
-
-    return {"access_token": access_token, "username": user.username}
+    return auth.apri_sessione(db, user, request, response)
 
 
 @router.get("/me", response_model=UserResponse)

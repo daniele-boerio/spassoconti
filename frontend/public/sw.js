@@ -4,7 +4,8 @@
  * Su iPhone la web app aggiunta alla Home lo supporta (cache e fetch), ma non
  * ha la sincronizzazione in background: i movimenti salvati offline li invia
  * l'app stessa quando è aperta (vedi features/transactions/offline_queue.ts),
- * non questo file.
+ * non questo file. Le notifiche push invece sì (da iOS 16.4, solo dalla Home):
+ * vedi i listener "push" e "notificationclick".
  *
  * Strategie:
  * - navigazioni (l'HTML): prima la rete, così un deploy nuovo arriva subito;
@@ -63,6 +64,52 @@ self.addEventListener("message", (event) => {
   if (event.data?.type === "clear-api-cache") {
     event.waitUntil(caches.delete(API_CACHE));
   }
+});
+
+// --- Notifiche push ---------------------------------------------------------
+//
+// Il server (services.invia_notifica) manda {title, body, url, tag}. Ogni push
+// DEVE mostrare una notifica: Safari e Chrome revocano l'iscrizione a chi
+// riceve push "silenziose".
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data?.text() };
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || "SpassoConti", {
+      body: data.body || "",
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      // Stesso tag = la nuova sostituisce la vecchia invece di accumularsi.
+      tag: data.tag || undefined,
+      data: { url: data.url || "/" },
+    }),
+  );
+});
+
+// Tocco sulla notifica: si apre la pagina giusta, riusando la finestra
+// dell'app se è già aperta.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || "/", self.location.origin);
+
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((windows) => {
+        const open = windows.find(
+          (client) => new URL(client.url).origin === target.origin,
+        );
+        if (open) {
+          return open.focus().then((client) => client?.navigate?.(target.href));
+        }
+        return self.clients.openWindow(target.href);
+      }),
+  );
 });
 
 async function trim(cacheName, max) {

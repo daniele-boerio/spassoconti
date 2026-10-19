@@ -23,8 +23,8 @@ vi.hoisted(() => {
   } as Storage;
 });
 
-import reducer, { selectLastTagId } from "./profile_slice";
-import { getProfile, logout } from "./api_calls";
+import reducer, { cancelTwoFactor, selectLastTagId } from "./profile_slice";
+import { getProfile, login, logout, verifyTwoFactor } from "./api_calls";
 import { ProfileResponse } from "./interfaces";
 import { createTransaction } from "../transactions/api_calls";
 import { Transaction } from "../transactions/interfaces";
@@ -165,5 +165,68 @@ describe("profile_slice — sessione ripresa da localStorage", () => {
     const state = reducer(initial, profileFromServer(null));
 
     expect(state.username).toBe("mario");
+  });
+});
+
+// Verifica in due passaggi: la password giusta, da sola, non deve far entrare.
+// Se il reducer trattasse la risposta "manca il codice" come un login riuscito,
+// l'app si aprirebbe con un token null e ogni chiamata andrebbe in 401.
+describe("profile_slice — login con la verifica in due passaggi", () => {
+  const loginNeedsCode = login.fulfilled(
+    {
+      access_token: null,
+      username: "mario",
+      mfa_required: true,
+      mfa_token: "mfa-token",
+    },
+    "req",
+    { username: "mario", password: "password123" },
+  );
+
+  it("la password giusta non autentica: aspetta il codice", () => {
+    const state = reducer(initial, loginNeedsCode);
+
+    expect(state.isAuthenticated).toBe(false);
+    expect(state.token).toBeNull();
+    expect(state.mfaToken).toBe("mfa-token");
+  });
+
+  it("il codice giusto apre la sessione e chiude il passo del codice", () => {
+    const waiting = reducer(initial, loginNeedsCode);
+    const state = reducer(
+      waiting,
+      verifyTwoFactor.fulfilled(
+        { access_token: "access", username: "mario" },
+        "req",
+        { mfa_token: "mfa-token", code: "123456" },
+      ),
+    );
+
+    expect(state.isAuthenticated).toBe(true);
+    expect(state.token).toBe("access");
+    expect(state.mfaToken).toBeNull();
+  });
+
+  it("un codice sbagliato resta sul codice, un token scaduto torna alla password", () => {
+    const waiting = reducer(initial, loginNeedsCode);
+    const params = { mfa_token: "mfa-token", code: "000000" };
+
+    const wrong = reducer(
+      waiting,
+      verifyTwoFactor.rejected(null, "req", params, { status: 400, detail: "x" }),
+    );
+    expect(wrong.mfaToken).toBe("mfa-token");
+
+    const expired = reducer(
+      waiting,
+      verifyTwoFactor.rejected(null, "req", params, { status: 401, detail: "x" }),
+    );
+    expect(expired.mfaToken).toBeNull();
+  });
+
+  it("'Indietro' dal codice riparte dalla password", () => {
+    const waiting = reducer(initial, loginNeedsCode);
+
+    expect(reducer(waiting, cancelTwoFactor()).mfaToken).toBeNull();
   });
 });

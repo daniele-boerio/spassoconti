@@ -1,6 +1,7 @@
 import base64
 import functools
 import io
+import json
 import os
 import re
 import threading
@@ -8,6 +9,7 @@ import time
 import requests
 import yfinance as yf
 from cryptography.fernet import Fernet, InvalidToken
+from pywebpush import WebPushException, webpush
 import jwt  # PyJWT (vedi auth.py: python-jose è stato tolto)
 from datetime import date, timedelta, datetime, timezone
 import logging
@@ -2003,3 +2005,334 @@ def remember_last_tag(db: Session, user_id: int, tag_id: Optional[int]) -> None:
     db.query(models.User).filter(models.User.id == user_id).update(
         {"last_tag_id": tag_id}
     )
+
+
+# --- NOTIFICHE PUSH ----------------------------------------------------------
+#
+# Web Push con chiavi VAPID: il server firma ogni invio con la chiave privata,
+# il browser accetta solo notifiche firmate con la pubblica che ha ricevuto
+# all'iscrizione. Senza le due variabili d'ambiente la funzione è spenta: niente
+# errori, i job finiscono subito e il FE non mostra l'attivazione.
+#
+# I testi sono in italiano: partono dal server, che non sa la lingua scelta
+# nell'app.
+
+# Una notifica non consegnata entro 12 ore (telefono spento) non serve più.
+PUSH_TTL = 12 * 3600
+SOGLIA_AVVISO_BUDGET = Decimal("80")
+
+
+def vapid_configurato() -> bool:
+    return bool(os.getenv("VAPID_PRIVATE_KEY") and os.getenv("VAPID_PUBLIC_KEY"))
+
+
+def _vapid_subject() -> str:
+    # Apple rifiuta un `sub` che non sia mailto: o https:// pubblico.
+    return os.getenv("VAPID_SUBJECT") or os.getenv(
+        "FRONTEND_URL", "https://conti.spassocasa.it"
+    ).rstrip("/")
+
+
+def invia_notifica(
+    db: Session,
+    user_id: int,
+    titolo: str,
+    corpo: str,
+    url: str = "/",
+    tag: Optional[str] = None,
+) -> int:
+    """Manda la notifica a tutti i dispositivi dell'utente; restituisce quanti
+    l'hanno accettata.
+
+    Un dispositivo che risponde 404/410 si è disiscritto (permesso revocato,
+    app tolta dalla Home): la riga si cancella. Il commit resta al chiamante.
+    Un errore di un dispositivo non ferma gli altri.
+    """
+    if not vapid_configurato():
+        return 0
+
+    payload = json.dumps({"title": titolo, "body": corpo, "url": url, "tag": tag})
+    inviate = 0
+    dispositivi = (
+        db.query(models.PushSubscription)
+        .filter(models.PushSubscription.user_id == user_id)
+        .all()
+    )
+    for sub in dispositivi:
+        try:
+            webpush(
+                subscription_info={
+                    "endpoint": sub.endpoint,
+                    "keys": {"p256dh": sub.p256dh, "auth": sub.auth},
+                },
+                data=payload,
+                vapid_private_key=os.getenv("VAPID_PRIVATE_KEY"),
+                # Dizionario nuovo a ogni giro: webpush ci scrive `aud`, che
+                # cambia da un servizio push all'altro (Apple, Google, Mozilla).
+                vapid_claims={"sub": _vapid_subject()},
+                ttl=PUSH_TTL,
+                timeout=10,
+            )
+            inviate += 1
+        except WebPushException as exc:
+            stato = exc.response.status_code if exc.response is not None else None
+            if stato in (404, 410):
+                logger.info("Dispositivo push %s disiscritto: lo tolgo", sub.id)
+                db.delete(sub)
+            else:
+                logger.warning("Push al dispositivo %s fallita (%s)", sub.id, stato)
+        except Exception:
+            logger.warning("Push al dispositivo %s fallita", sub.id, exc_info=True)
+    return inviate
+
+
+def _prima_volta(db: Session, user_id: int, chiave: str) -> bool:
+    """Registra la chiave e dice se è nuova: ogni notifica parte una volta."""
+    gia = (
+        db.query(models.NotificaInviata.id)
+        .filter(
+            models.NotificaInviata.user_id == user_id,
+            models.NotificaInviata.chiave == chiave,
+        )
+        .first()
+    )
+    if gia:
+        return False
+    db.add(models.NotificaInviata(user_id=user_id, chiave=chiave))
+    db.flush()
+    return True
+
+
+def _euro(importo: Decimal) -> str:
+    """1234.5 → "1.234,50 €" (formato italiano, come l'app)."""
+    testo = f"{Decimal(importo).quantize(Decimal('0.01')):,.2f}"
+    return testo.replace(",", "X").replace(".", ",").replace("X", ".") + " €"
+
+
+def _livello_budget(speso: Decimal, budget: Decimal) -> Optional[str]:
+    """Gemello di `levelOf` in FE features/statistics/budget_alerts.ts."""
+    if budget <= 0:
+        return "over" if speso > 0 else None
+    if speso > budget:
+        return "over"
+    if speso * 100 / budget >= SOGLIA_AVVISO_BUDGET:
+        return "warning"
+    return None
+
+
+def avvisi_budget(db: Session, user_id: int, oggi: date) -> list[dict]:
+    """I budget del mese di `oggi` vicini al limite o sforati: il tetto di spesa
+    complessivo ("total") e quelli per categoria ("cat:<id>").
+
+    Stesse regole degli avvisi in app: uscite al netto dei rimborsi
+    (`importo_effettivo`), soglia di avviso all'80%.
+    """
+    primo = oggi.replace(day=1)
+    ultimo = primo + relativedelta(months=1) - timedelta(days=1)
+    nel_mese = (
+        models.Transazione.user_id == user_id,
+        models.Transazione.deleted_at.is_(None),
+        models.Transazione.tipo == "USCITA",
+        models.Transazione.data >= primo,
+        models.Transazione.data <= ultimo,
+    )
+
+    avvisi = []
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user and user.monthly_spending_budget is not None:
+        speso = (
+            db.query(func.sum(importo_effettivo())).filter(*nel_mese).scalar()
+            or Decimal("0")
+        )
+        livello = _livello_budget(speso, user.monthly_spending_budget)
+        if livello:
+            avvisi.append(
+                {
+                    "chiave": "total",
+                    "nome": None,
+                    "speso": speso,
+                    "budget": user.monthly_spending_budget,
+                    "livello": livello,
+                }
+            )
+
+    categorie = (
+        db.query(models.Categoria)
+        .filter(
+            models.Categoria.user_id == user_id,
+            models.Categoria.budget_mensile.isnot(None),
+        )
+        .all()
+    )
+    if categorie:
+        spese = dict(
+            db.query(models.Transazione.categoria_id, func.sum(importo_effettivo()))
+            .filter(
+                *nel_mese,
+                models.Transazione.categoria_id.in_([c.id for c in categorie]),
+            )
+            .group_by(models.Transazione.categoria_id)
+            .all()
+        )
+        for categoria in categorie:
+            speso = spese.get(categoria.id) or Decimal("0")
+            livello = _livello_budget(speso, categoria.budget_mensile)
+            if livello:
+                avvisi.append(
+                    {
+                        "chiave": f"cat:{categoria.id}",
+                        "nome": categoria.nome,
+                        "speso": speso,
+                        "budget": categoria.budget_mensile,
+                        "livello": livello,
+                    }
+                )
+    return avvisi
+
+
+def _testo_avviso_budget(avviso: dict) -> tuple[str, str]:
+    nome = avviso["nome"]
+    if avviso["livello"] == "over":
+        titolo = f"Budget {nome} superato" if nome else "Budget del mese superato"
+    else:
+        titolo = f"Budget {nome} quasi finito" if nome else "Budget del mese quasi finito"
+    corpo = f"Hai speso {_euro(avviso['speso'])} su {_euro(avviso['budget'])}."
+    return titolo, corpo
+
+
+def _utenti_da_avvisare(db: Session, preferenza) -> list[int]:
+    """Chi ha almeno un dispositivo iscritto e la preferenza accesa."""
+    return [
+        uid
+        for (uid,) in db.query(models.PushSubscription.user_id)
+        .join(models.User, models.User.id == models.PushSubscription.user_id)
+        .filter(preferenza.is_(True))
+        .distinct()
+        .all()
+    ]
+
+
+@traccia_job("notifiche_budget")
+def task_notifiche_budget():
+    """Avvisa quando un budget del mese arriva all'80% e quando si sfora.
+
+    Gira ogni mezz'ora di giorno: prende anche i movimenti che non passano dal
+    form (ricorrenze, import dalla banca). Ogni soglia si notifica una volta al
+    mese; dopo lo sforamento il "quasi finito" non arriva più.
+    """
+    if not vapid_configurato():
+        return
+    db = SessionLocal()
+    oggi = date.today()
+    mese = oggi.strftime("%Y-%m")
+    try:
+        for user_id in _utenti_da_avvisare(db, models.User.notifica_budget):
+            try:
+                for avviso in avvisi_budget(db, user_id, oggi):
+                    base = f"budget:{avviso['chiave']}:{mese}"
+                    if not _prima_volta(db, user_id, f"{base}:{avviso['livello']}"):
+                        continue
+                    if avviso["livello"] == "over":
+                        _prima_volta(db, user_id, f"{base}:warning")
+                    titolo, corpo = _testo_avviso_budget(avviso)
+                    invia_notifica(
+                        db,
+                        user_id,
+                        titolo,
+                        corpo,
+                        url="/analysis",
+                        tag=f"budget-{avviso['chiave']}",
+                    )
+                db.commit()
+            except Exception:
+                db.rollback()
+                logger.exception("Notifiche budget fallite per user_id=%s", user_id)
+    finally:
+        db.close()
+
+
+@traccia_job("promemoria_ricorrenze")
+def task_promemoria_ricorrenze():
+    """Promemoria del mattino sulle ricorrenze.
+
+    - Le uscite che si registrano domani: il giorno prima, per non trovarsi il
+      conto scoperto.
+    - Le ricorrenze a importo variabile scadute: lo scheduler non le registra da
+      sé, aspettano l'importo vero (bollette).
+
+    Non lo fa il job delle ricorrenze: gira alle 3 di notte.
+    """
+    if not vapid_configurato():
+        return
+    db = SessionLocal()
+    oggi = date.today()
+    domani = oggi + timedelta(days=1)
+    try:
+        for user_id in _utenti_da_avvisare(db, models.User.notifica_ricorrenze):
+            try:
+                attive = db.query(models.Ricorrenza).filter(
+                    models.Ricorrenza.user_id == user_id,
+                    models.Ricorrenza.attiva.is_(True),
+                )
+
+                in_arrivo = [
+                    ric
+                    for ric in attive.filter(
+                        models.Ricorrenza.importo_variabile.is_(False),
+                        models.Ricorrenza.tipo == "USCITA",
+                        models.Ricorrenza.prossima_esecuzione == domani,
+                    ).order_by(models.Ricorrenza.importo.desc())
+                    if _prima_volta(db, user_id, f"ricorrenza:{ric.id}:{domani}")
+                ]
+                if len(in_arrivo) == 1:
+                    ric = in_arrivo[0]
+                    invia_notifica(
+                        db,
+                        user_id,
+                        f"Domani: {ric.nome}",
+                        f"Si registra un'uscita di {_euro(ric.importo)}.",
+                        url="/recurrings",
+                        tag="ricorrenze-domani",
+                    )
+                elif in_arrivo:
+                    totale = sum((ric.importo for ric in in_arrivo), Decimal("0"))
+                    invia_notifica(
+                        db,
+                        user_id,
+                        f"Domani {len(in_arrivo)} uscite ricorrenti",
+                        ", ".join(ric.nome for ric in in_arrivo)
+                        + f": {_euro(totale)} in tutto.",
+                        url="/recurrings",
+                        tag="ricorrenze-domani",
+                    )
+
+                da_confermare = [
+                    ric
+                    for ric in attive.filter(
+                        models.Ricorrenza.importo_variabile.is_(True),
+                        models.Ricorrenza.prossima_esecuzione <= oggi,
+                    )
+                    if _prima_volta(
+                        db,
+                        user_id,
+                        f"ricorrenza-variabile:{ric.id}:{ric.prossima_esecuzione}",
+                    )
+                ]
+                if da_confermare:
+                    nomi = ", ".join(ric.nome for ric in da_confermare)
+                    invia_notifica(
+                        db,
+                        user_id,
+                        "Importo da confermare",
+                        f"{nomi}: scrivi l'importo per registrarla."
+                        if len(da_confermare) == 1
+                        else f"{nomi}: scrivi gli importi per registrarle.",
+                        url="/recurrings",
+                        tag="ricorrenze-variabili",
+                    )
+                db.commit()
+            except Exception:
+                db.rollback()
+                logger.exception("Promemoria ricorrenze falliti per user_id=%s", user_id)
+    finally:
+        db.close()

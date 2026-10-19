@@ -7,8 +7,13 @@ import { isQueuedOffline } from "../features/transactions/offline_queue";
 
 // Un 401 su login/registrazione vuol dire "credenziali sbagliate", non "sessione
 // scaduta": va mostrato il messaggio del server, non buttato fuori l'utente (che
-// dentro non c'è ancora mai stato).
-const CREDENTIAL_THUNKS = ["profile/login/", "profile/register/"];
+// dentro non c'è ancora mai stato). Lo stesso per il codice della verifica in
+// due passaggi: il 401 lì è "token del primo passo scaduto".
+const CREDENTIAL_THUNKS = [
+  "profile/login/",
+  "profile/register/",
+  "profile/verifyTwoFactor/",
+];
 
 const titleKey = (status: number): string => {
   if (status === 400 || status === 422) return "error_title_validation";

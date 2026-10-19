@@ -21,6 +21,7 @@ import SheetHost from "./components/sheet_host/sheet_host";
 import ToastHost from "./components/toast/toast";
 import { useThemeSync } from "./features/ui/use_theme";
 import { useOfflineSync } from "./features/transactions/use_offline_sync";
+import { syncThisDevice } from "./features/notifiche/api_calls";
 import { lazyWithRetry } from "./services/lazy_with_retry";
 
 // Code-splitting per route: ogni pagina è un chunk separato caricato solo
@@ -84,6 +85,12 @@ function App() {
   // Invia i movimenti salvati senza rete appena è possibile (avvio, ritorno
   // online, app di nuovo in primo piano).
   useOfflineSync();
+
+  // Ripresenta al server l'iscrizione push di questo dispositivo: il browser
+  // può averla rinnovata, o sul telefono è entrato un altro account.
+  useEffect(() => {
+    if (isAuthenticated) syncThisDevice();
+  }, [isAuthenticated]);
 
   const dispatch = useAppDispatch();
 

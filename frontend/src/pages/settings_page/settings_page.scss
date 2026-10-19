@@ -276,3 +276,139 @@
     }
   }
 }
+
+// Sheet "Verifica in due passaggi".
+.two-factor {
+  &__text {
+    margin: 0 0 14px;
+    font-size: 14px;
+    line-height: 1.45;
+    color: v.$muted;
+  }
+
+  &__open {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: v.$tap-target;
+    margin-bottom: 14px;
+
+    border-radius: v.$r-field;
+    background: v.$accent-soft;
+    color: v.$accent;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  // Il QR resta nero su bianco anche nel tema scuro: è quello che le
+  // fotocamere leggono meglio.
+  &__qr {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 14px;
+
+    img {
+      padding: 8px;
+      border-radius: v.$r-inner;
+      background: #fff;
+    }
+
+    figcaption {
+      font-size: 12px;
+      color: v.$muted;
+    }
+  }
+
+  &__secret {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 4px 10px;
+    width: 100%;
+    margin-bottom: 14px;
+    padding: 12px 14px;
+
+    border: 1px solid v.$line;
+    border-radius: v.$r-field;
+    background: v.$surface-2;
+    color: v.$ink;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    .two-factor__label {
+      grid-column: 1 / -1;
+    }
+
+    code {
+      font-size: 14px;
+      letter-spacing: 0.04em;
+      word-break: break-all;
+    }
+
+    i {
+      color: v.$muted;
+    }
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+
+  &__label {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: v.$muted;
+  }
+
+  &__input {
+    min-height: v.$tap-target;
+    padding: 0 14px;
+
+    border: 1px solid v.$line;
+    border-radius: v.$r-field;
+    background: v.$surface;
+    color: v.$ink;
+    font-family: inherit;
+    font-size: v.$fs-field;
+    letter-spacing: 0.08em;
+
+    &:focus {
+      outline: 2px solid v.$accent;
+      outline-offset: 1px;
+    }
+  }
+
+  &__codes {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+      padding: 10px;
+      border-radius: v.$r-inner;
+      background: v.$surface-2;
+      text-align: center;
+    }
+
+    code {
+      font-size: 14px;
+      letter-spacing: 0.04em;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+}

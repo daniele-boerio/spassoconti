@@ -24,8 +24,46 @@ class UserOut(UserBase):
 
 
 class Token(BaseModel):
-    access_token: str
+    """Esito di login, registrazione e refresh.
+
+    Con la 2FA attiva il login risponde senza `access_token`: `mfa_required` è
+    vero e `mfa_token` va ripresentato a POST /auth/2fa/verify con il codice.
+    """
+
+    access_token: Optional[str] = None
     username: str
+    mfa_required: bool = False
+    mfa_token: Optional[str] = None
+
+
+class TwoFactorVerify(BaseModel):
+    mfa_token: str
+    # Codice a 6 cifre dell'app o codice di recupero ("a1b2c-3d4e5").
+    code: str = Field(..., min_length=6, max_length=32)
+
+
+class TwoFactorCode(BaseModel):
+    code: str = Field(..., min_length=6, max_length=32)
+
+
+class TwoFactorDisable(TwoFactorCode):
+    password: str
+
+
+class TwoFactorStatus(BaseModel):
+    enabled: bool
+    recovery_codes_remaining: int
+
+
+class TwoFactorSetup(BaseModel):
+    # Il segreto in base32, da scrivere a mano se il QR non si può inquadrare
+    # (il telefono che configura è lo stesso che mostra la pagina).
+    secret: str
+    otpauth_uri: str
+
+
+class RecoveryCodesOut(BaseModel):
+    recovery_codes: list[str]
 
 
 class LoginRequest(BaseModel):

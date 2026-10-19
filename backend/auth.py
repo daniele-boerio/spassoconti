@@ -1,10 +1,15 @@
 from dotenv import load_dotenv
+import base64
 import bcrypt
 import hashlib
+import hmac
 import logging
 import os
 import secrets
+import time
 from datetime import datetime, timedelta, timezone
+from cryptography.fernet import Fernet, InvalidToken
+import pyotp
 # PyJWT e non python-jose: jose è fermo, e fino alla 3.5.0 accetta chiavi
 # pubbliche come segreto HMAC (CVE-2026-85394, nessuna versione corretta).
 import jwt
@@ -13,7 +18,7 @@ from fastapi import Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from database import SessionLocal
-from models import RefreshToken, User
+from models import RecoveryCode, RefreshToken, User
 
 load_dotenv()
 
@@ -58,6 +63,204 @@ def create_access_token(data: dict):
         to_encode, os.getenv("SECRET_KEY"), algorithm=os.getenv("ALGORITHM")
     )
     return encoded_jwt
+
+
+# --- VERIFICA IN DUE PASSAGGI (TOTP) -----------------------------------------
+#
+# Il login di chi ha la 2FA attiva è in due tempi: la password giusta non dà la
+# sessione, ma un token a 5 minuti buono solo per POST /auth/2fa/verify, dove si
+# presenta il codice dell'app di autenticazione (o un codice di recupero).
+# La 2FA si chiede al login: il refresh di una sessione già aperta non la ripete,
+# il dispositivo l'ha già superata.
+
+TOTP_ISSUER = "SpassoConti"
+MFA_TOKEN_EXPIRE_MINUTES = 5
+MFA_SCOPE = "mfa"
+CODICI_RECUPERO = 10
+
+
+def create_mfa_token(user: User) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=MFA_TOKEN_EXPIRE_MINUTES)
+    return jwt.encode(
+        {
+            "user_id": user.id,
+            "token_version": user.token_version,
+            "scope": MFA_SCOPE,
+            "exp": expire,
+        },
+        os.getenv("SECRET_KEY"),
+        algorithm=os.getenv("ALGORITHM"),
+    )
+
+
+def decode_mfa_token(token: str) -> dict:
+    invalid = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Two-factor session expired, please log in again",
+    )
+    try:
+        payload = jwt.decode(
+            token, os.getenv("SECRET_KEY"), algorithms=[os.getenv("ALGORITHM")]
+        )
+    except PyJWTError:
+        raise invalid
+    if payload.get("scope") != MFA_SCOPE or payload.get("user_id") is None:
+        raise invalid
+    return payload
+
+
+def _cifrario_totp() -> Fernet:
+    """Chiave Fernet derivata da SECRET_KEY.
+
+    Niente variabile d'ambiente in più da dimenticare. Il prezzo: se SECRET_KEY
+    cambia, i segreti salvati non si decifrano più e i codici dell'app smettono
+    di valere. Si entra con un codice di recupero (sono solo hash, non cifrati)
+    e si riconfigura la 2FA.
+    """
+    chiave = hashlib.sha256(
+        b"spassoconti-totp:" + os.getenv("SECRET_KEY", "").encode("utf-8")
+    ).digest()
+    return Fernet(base64.urlsafe_b64encode(chiave))
+
+
+def cifra_segreto_totp(segreto: str) -> str:
+    return _cifrario_totp().encrypt(segreto.encode("utf-8")).decode("utf-8")
+
+
+def _decifra_segreto_totp(cifrato: str | None) -> str | None:
+    if not cifrato:
+        return None
+    try:
+        return _cifrario_totp().decrypt(cifrato.encode("utf-8")).decode("utf-8")
+    except InvalidToken:
+        logger.error(
+            "Segreto TOTP non decifrabile (SECRET_KEY cambiata?): "
+            "serve un codice di recupero"
+        )
+        return None
+
+
+def nuovo_segreto_totp() -> str:
+    return pyotp.random_base32()
+
+
+def uri_totp(segreto: str, email: str) -> str:
+    """L'otpauth:// che le app di autenticazione leggono dal QR (o dal link)."""
+    return pyotp.TOTP(segreto).provisioning_uri(name=email, issuer_name=TOTP_ISSUER)
+
+
+def _normalizza_codice(codice: str) -> str:
+    return codice.strip().replace(" ", "").replace("-", "").lower()
+
+
+def _verifica_codice_totp(user: User, codice: str) -> bool:
+    """Accetta il codice dell'intervallo corrente e dei due vicini (±30 s di
+    orologio sfasato), ma mai uno già usato: `totp_last_step` sale a ogni
+    codice accettato, così chi lo legge da sopra la spalla non lo riusa."""
+    segreto = _decifra_segreto_totp(user.totp_secret)
+    if not segreto:
+        return False
+    totp = pyotp.TOTP(segreto)
+    adesso = int(time.time()) // totp.interval
+    for step in (adesso - 1, adesso, adesso + 1):
+        if user.totp_last_step is not None and step <= user.totp_last_step:
+            continue
+        if hmac.compare_digest(totp.at(step * totp.interval), codice):
+            user.totp_last_step = step
+            return True
+    return False
+
+
+def _hash_codice_recupero(codice: str) -> str:
+    return hashlib.sha256(_normalizza_codice(codice).encode("utf-8")).hexdigest()
+
+
+def genera_codici_recupero(db: Session, user_id: int) -> list[str]:
+    """Sostituisce i codici di recupero dell'utente con 10 nuovi.
+
+    Restituisce i codici in chiaro: è l'unica volta che esistono, l'utente li
+    deve salvare adesso. Formato "a1b2c-3d4e5" (40 bit, il trattino è solo
+    per leggerli).
+    """
+    db.query(RecoveryCode).filter(RecoveryCode.user_id == user_id).delete()
+    codici = []
+    for _ in range(CODICI_RECUPERO):
+        grezzo = secrets.token_hex(5)
+        codici.append(f"{grezzo[:5]}-{grezzo[5:]}")
+        db.add(RecoveryCode(user_id=user_id, code_hash=_hash_codice_recupero(grezzo)))
+    return codici
+
+
+def codici_recupero_rimasti(db: Session, user_id: int) -> int:
+    return (
+        db.query(RecoveryCode)
+        .filter(RecoveryCode.user_id == user_id, RecoveryCode.used_at.is_(None))
+        .count()
+    )
+
+
+def _usa_codice_recupero(db: Session, user_id: int, codice: str) -> bool:
+    riga = (
+        db.query(RecoveryCode)
+        .filter(
+            RecoveryCode.user_id == user_id,
+            RecoveryCode.code_hash == _hash_codice_recupero(codice),
+            RecoveryCode.used_at.is_(None),
+        )
+        .with_for_update()
+        .first()
+    )
+    if riga is None:
+        return False
+    riga.used_at = datetime.now(timezone.utc)
+    return True
+
+
+def apri_sessione(db: Session, user: User, request: Request, response: Response) -> dict:
+    """Emette la sessione del dispositivo: refresh token nel cookie httpOnly e
+    access token nella risposta. Fa il commit (insieme a quello che il chiamante
+    ha già scritto, es. il codice di recupero consumato).
+
+    Qui le credenziali sono già state validate: se fallisce, il problema è la
+    creazione della sessione, e il messaggio deve dirlo invece di far sembrare
+    il login stesso rotto (vedi `/auth/refresh`, stessa gestione).
+    """
+    try:
+        raw_refresh = issue_refresh_token(
+            db, user.id, user_agent=request.headers.get("user-agent")
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "Login: creazione della sessione fallita per user_id=%s", user.id
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Credentials are valid but the device session could not be created. Please try again",
+        )
+
+    set_refresh_cookie(response, raw_refresh)
+
+    # La token_version nel JWT serve a invalidarlo (cambio password, logout-all)
+    access_token = create_access_token(
+        data={"user_id": user.id, "token_version": user.token_version}
+    )
+    return {"access_token": access_token, "username": user.username}
+
+
+def verifica_secondo_fattore(db: Session, user: User, codice: str) -> bool:
+    """Codice a 6 cifre dell'app, oppure un codice di recupero (che si brucia).
+
+    Non fa commit: lo fa il chiamante, insieme al resto (sessione emessa, 2FA
+    attivata o spenta).
+    """
+    codice = _normalizza_codice(codice or "")
+    if not codice:
+        return False
+    if codice.isdigit() and len(codice) == 6:
+        return _verifica_codice_totp(user, codice)
+    return _usa_codice_recupero(db, user.id, codice)
 
 
 # --- REFRESH TOKEN (sessione persistente per dispositivo) ---------------------
@@ -289,6 +492,13 @@ def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(secu
 
         user_id: int = payload.get("user_id")
         token_version: int = payload.get("token_version", 1)
+
+        # Un token con `scope` non è un access token: è quello a 5 minuti del
+        # secondo passaggio della 2FA (create_mfa_token). Accettarlo qui vorrebbe
+        # dire entrare con la sola password.
+        if payload.get("scope") is not None:
+            logger.debug("token con scope %s usato come access token", payload.get("scope"))
+            raise credentials_exception
 
         if user_id is None:
             logger.debug("user_id non trovato nel payload del token")

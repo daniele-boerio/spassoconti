@@ -1,11 +1,16 @@
 import { createSlice, PayloadAction, Action } from "@reduxjs/toolkit";
 import {
+  disableTwoFactor,
+  enableTwoFactor,
   getProfile,
+  getTwoFactorStatus,
   login,
   logout,
+  regenerateRecoveryCodes,
   register,
   restoreSession,
   updateUsername,
+  verifyTwoFactor,
 } from "./api_calls";
 import { AuthResponse, ProfileResponse, ProfileState } from "./interfaces";
 import { RootState } from "../../store/store";
@@ -28,6 +33,8 @@ const initialState: ProfileState = {
   restoring: !!savedToken,
   isOpenBankingAdmin: false,
   lastTagId: null,
+  mfaToken: null,
+  twoFactor: null,
 };
 
 // --- HELPERS ---
@@ -40,6 +47,20 @@ const handleRejected = (state: ProfileState) => {
   state.loading = false;
 };
 
+/** Sessione aperta: access token in memoria e in localStorage. */
+const signIn = (state: ProfileState, payload: AuthResponse) => {
+  if (!payload.access_token) return;
+
+  state.restoring = false;
+  state.mfaToken = null;
+  state.token = payload.access_token;
+  state.username = payload.username;
+  state.isAuthenticated = true;
+
+  localStorage.setItem("token", payload.access_token);
+  localStorage.setItem("username", payload.username);
+};
+
 const profileSlice = createSlice({
   name: "profile",
   initialState,
@@ -50,37 +71,63 @@ const profileSlice = createSlice({
       state.isAuthenticated = false;
       state.isOpenBankingAdmin = false;
       state.lastTagId = null;
+      state.twoFactor = null;
       localStorage.removeItem("token");
       localStorage.removeItem("username");
+    },
+    /** "Torna indietro" dal codice: si riparte dalla password. */
+    cancelTwoFactor: (state) => {
+      state.mfaToken = null;
     },
   },
   extraReducers: (builder) => {
     builder
-      // Fulfilled: Login & Register hanno lo stesso comportamento
+      // Login, registrazione e secondo passo della 2FA finiscono allo stesso
+      // modo quando c'è un access token. Il login di un account con la 2FA
+      // risponde invece senza: la schermata passa a chiedere il codice.
+      .addCase(login.fulfilled, (state, action: PayloadAction<AuthResponse>) => {
+        if (action.payload.mfa_required && action.payload.mfa_token) {
+          state.mfaToken = action.payload.mfa_token;
+          return;
+        }
+        signIn(state, action.payload);
+      })
+      .addCase(register.fulfilled, (state, action: PayloadAction<AuthResponse>) => {
+        signIn(state, action.payload);
+      })
       .addCase(
-        login.fulfilled,
+        verifyTwoFactor.fulfilled,
         (state, action: PayloadAction<AuthResponse>) => {
-          state.restoring = false;
-          state.token = action.payload.access_token;
-          state.username = action.payload.username;
-          state.isAuthenticated = true;
-
-          localStorage.setItem("token", action.payload.access_token);
-          localStorage.setItem("username", action.payload.username);
+          signIn(state, action.payload);
         },
       )
-      .addCase(
-        register.fulfilled,
-        (state, action: PayloadAction<AuthResponse>) => {
-          state.restoring = false;
-          state.token = action.payload.access_token;
-          state.username = action.payload.username;
-          state.isAuthenticated = true;
+      // Token del primo passo scaduto (5 minuti) o password cambiata nel
+      // frattempo: si torna a chiedere la password. Un codice sbagliato (400)
+      // invece lascia sul codice.
+      .addCase(verifyTwoFactor.rejected, (state, action) => {
+        if ((action.payload as { status?: number } | undefined)?.status === 401) {
+          state.mfaToken = null;
+        }
+      })
 
-          localStorage.setItem("token", action.payload.access_token);
-          localStorage.setItem("username", action.payload.username);
-        },
-      )
+      .addCase(getTwoFactorStatus.fulfilled, (state, action) => {
+        state.twoFactor = action.payload;
+      })
+      .addCase(disableTwoFactor.fulfilled, (state, action) => {
+        state.twoFactor = action.payload;
+      })
+      .addCase(enableTwoFactor.fulfilled, (state, action) => {
+        state.twoFactor = {
+          enabled: true,
+          recovery_codes_remaining: action.payload.recovery_codes.length,
+        };
+      })
+      .addCase(regenerateRecoveryCodes.fulfilled, (state, action) => {
+        if (state.twoFactor) {
+          state.twoFactor.recovery_codes_remaining =
+            action.payload.recovery_codes.length;
+        }
+      })
 
       // Lo username nuovo arriva col profilo aggiornato: stesso payload della
       // GET, quindi lo stesso reducer.
@@ -160,6 +207,7 @@ const profileSlice = createSlice({
         state.isAuthenticated = false;
         state.isOpenBankingAdmin = false;
         state.lastTagId = null;
+        state.twoFactor = null;
 
         localStorage.removeItem("token");
         localStorage.removeItem("username");
@@ -182,7 +230,11 @@ const profileSlice = createSlice({
   },
 });
 
-export const { setLogout } = profileSlice.actions;
+export const { setLogout, cancelTwoFactor } = profileSlice.actions;
+
+export const selectMfaToken = (state: RootState) => state.profile.mfaToken;
+
+export const selectTwoFactor = (state: RootState) => state.profile.twoFactor;
 
 export const selectProfileLoading = (state: RootState) => state.profile.loading;
 

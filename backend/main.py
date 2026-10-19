@@ -25,6 +25,8 @@ from services import (
     task_sync_bank_connectors,
     task_verifica_saldi,
     task_pulizia_refresh_token,
+    task_notifiche_budget,
+    task_promemoria_ricorrenze,
 )
 from routers import (
     auth,
@@ -42,6 +44,8 @@ from routers import (
     bank_connectors,
     bank_proposals,
     open_banking,
+    two_factor,
+    notifiche,
 )
 
 logger = logging.getLogger(__name__)
@@ -86,6 +90,10 @@ scheduler.add_job(task_pulizia_refresh_token, "cron", hour=5, minute=0)
 # Ogni 6 ore (4 volte/giorno): le API AIS (PSD2) limitano gli accessi non
 # presidiati, quindi una sync oraria genera 429 "Too Many Requests".
 scheduler.add_job(task_sync_bank_connectors, "cron", hour="*/6")
+# Notifiche push solo di giorno (ore UTC: in Italia 7/8 - 21/22): un avviso di
+# budget alle 3 di notte sveglia e basta.
+scheduler.add_job(task_notifiche_budget, "cron", hour="6-20", minute="*/30")
+scheduler.add_job(task_promemoria_ricorrenze, "cron", hour=7, minute=0)
 
 
 VARIABILI_OBBLIGATORIE = (
@@ -123,6 +131,11 @@ def verifica_configurazione() -> None:
         logger.warning("SECRET_KEY corta (< 32 caratteri): meglio rigenerarla")
     if not all(os.getenv(n) for n in ("SMTP_SERVER", "SMTP_USERNAME", "SMTP_PASSWORD")):
         logger.error("SMTP non configurato: il reset password non invierà email")
+    if not (os.getenv("VAPID_PUBLIC_KEY") and os.getenv("VAPID_PRIVATE_KEY")):
+        logger.warning(
+            "VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY mancanti: notifiche push spente "
+            "(chiavi da scripts/genera_chiavi_vapid.py)"
+        )
 
 
 @asynccontextmanager
@@ -234,6 +247,8 @@ api.include_router(bank_proposals.router)  # Proposte di transazione (tutte le p
 api.include_router(open_banking.router)  # Open Banking (GoCardless) requisition flow
 api.include_router(debiti.router)  # Debiti
 api.include_router(auth.router)  # Endpoint per forgot-password e reset-password
+api.include_router(two_factor.router)  # Verifica in due passaggi (/auth/2fa)
+api.include_router(notifiche.router)  # Notifiche push
 
 
 # Il healthcheck del container. Tocca il database apposta: un BE che risponde ma
@@ -261,6 +276,9 @@ FRESCHEZZA_JOB = {
     "verifica_saldi": timedelta(hours=26),
     "pulizia_refresh_token": timedelta(hours=26),
     "sync_bank_connectors": timedelta(hours=7),
+    # Ogni mezz'ora dalle 6 alle 20:30 UTC: di notte il buco più lungo è ~10 ore.
+    "notifiche_budget": timedelta(hours=11),
+    "promemoria_ricorrenze": timedelta(hours=26),
 }
 
 

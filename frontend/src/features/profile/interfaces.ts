@@ -1,8 +1,38 @@
 // --- INTERFACCE ---
 
 export interface AuthResponse {
-  access_token: string;
+  /** null quando il login chiede il secondo passaggio (`mfa_required`). */
+  access_token: string | null;
   username: string;
+  mfa_required?: boolean;
+  /** Token a 5 minuti da ripresentare col codice a /auth/2fa/verify. */
+  mfa_token?: string | null;
+}
+
+export interface VerifyTwoFactorParams {
+  mfa_token: string;
+  /** Codice a 6 cifre dell'app o codice di recupero. */
+  code: string;
+}
+
+export interface TwoFactorStatus {
+  enabled: boolean;
+  recovery_codes_remaining: number;
+}
+
+export interface TwoFactorSetup {
+  /** Il segreto in base32, da scrivere a mano nell'app se il QR non si può inquadrare. */
+  secret: string;
+  otpauth_uri: string;
+}
+
+export interface RecoveryCodesResponse {
+  recovery_codes: string[];
+}
+
+export interface DisableTwoFactorParams {
+  password: string;
+  code: string;
 }
 
 export interface LoginParams {
@@ -31,6 +61,13 @@ export interface ProfileState {
   // ricordato sull'account (quindi valido su ogni dispositivo). null = nessuna
   // precompilazione, ed è lo stato in cui si torna salvando senza tag.
   lastTagId: string | null;
+  /**
+   * Password giusta, manca il codice della verifica in due passaggi: finché
+   * c'è, la schermata di accesso chiede il codice invece delle credenziali.
+   */
+  mfaToken: string | null;
+  /** Stato della 2FA dell'account; null finché non è stato chiesto. */
+  twoFactor: TwoFactorStatus | null;
 }
 
 export interface ProfileResponse {

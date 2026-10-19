@@ -62,6 +62,12 @@ services:
       - SMTP_USERNAME=${SMTP_USERNAME:-}
       - SMTP_PASSWORD=${SMTP_PASSWORD:-}
       - EMAIL_FROM=${EMAIL_FROM:-noreply@spassocasa.it}
+      # Notifiche push (Web Push). Vuote = notifiche spente, l'app non mostra
+      # l'attivazione. Si generano una volta con backend/scripts/genera_chiavi_vapid.py:
+      # cambiarle fa perdere le iscrizioni di tutti i dispositivi.
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
+      - VAPID_SUBJECT=${VAPID_SUBJECT:-https://conti.spassocasa.it}
     healthcheck:
       # /api/health interroga il database: se il BE non raggiunge Postgres il
       # container risulta unhealthy, invece di "healthy" con ogni chiamata in 500.

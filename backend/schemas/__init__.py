@@ -9,6 +9,19 @@ from .user import (
     UserResponse,
     ForgotPasswordRequest,
     ResetPasswordRequest,
+    TwoFactorVerify,
+    TwoFactorCode,
+    TwoFactorDisable,
+    TwoFactorStatus,
+    TwoFactorSetup,
+    RecoveryCodesOut,
+)
+from .notifica import (
+    NotificheOut,
+    NotifichePreferenze,
+    PushSubscriptionIn,
+    PushSubscriptionRemove,
+    NotificaProvaOut,
 )
 from .conto import (
     ContoBase,

@@ -17,8 +17,11 @@ import type { ThemePreference } from "../../features/ui/theme";
 import {
   selectProfileEmail,
   selectProfileUsername,
+  selectTwoFactor,
 } from "../../features/profile/profile_slice";
-import { logout } from "../../features/profile/api_calls";
+import { getTwoFactorStatus, logout } from "../../features/profile/api_calls";
+import NotificationsSection from "./notifications_section";
+import TwoFactorSheet from "./two_factor_sheet";
 import {
   getConti,
   getCurrentMonthExpenses,
@@ -54,7 +57,10 @@ export default function SettingsPage() {
   const conti = useAppSelector(selectContiConti);
   const includeFutureRecurring = useAppSelector(selectIncludeFutureRecurring);
 
+  const twoFactor = useAppSelector(selectTwoFactor);
+
   const [importOpen, setImportOpen] = useState(false);
+  const [twoFactorOpen, setTwoFactorOpen] = useState(false);
   const [budgetSheetOpen, setBudgetSheetOpen] = useState(false);
   const [budgetDraft, setBudgetDraft] = useState("");
   const [budgetInvalid, setBudgetInvalid] = useState(false);
@@ -64,6 +70,7 @@ export default function SettingsPage() {
     dispatch(getCurrentMonthExpenses());
     // "Banche collegate" conta i conti con un collegamento attivo.
     dispatch(getConti());
+    dispatch(getTwoFactorStatus());
   }, [dispatch]);
 
   const linkedAccounts = conti.filter(
@@ -237,6 +244,34 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        <NotificationsSection />
+
+        <section className="settings-group">
+          <h2 className="settings-group__title">{t("settings_security")}</h2>
+
+          <div className="settings-card">
+            <button
+              type="button"
+              className="settings-row settings-row--tappable"
+              onClick={() => setTwoFactorOpen(true)}
+            >
+              <span className="settings-row__text">
+                <span className="settings-row__label">
+                  {t("two_factor_title")}
+                </span>
+                <span className="settings-row__hint">
+                  {t("two_factor_row_hint")}
+                </span>
+              </span>
+
+              <span className="settings-row__value">
+                {twoFactor?.enabled ? t("two_factor_on") : t("two_factor_off")}
+              </span>
+              <i className="ph-bold ph-caret-right" aria-hidden="true" />
+            </button>
+          </div>
+        </section>
+
         <button
           type="button"
           className="settings-logout"
@@ -250,6 +285,11 @@ export default function SettingsPage() {
       <ImportStatementDialog
         visible={importOpen}
         onHide={() => setImportOpen(false)}
+      />
+
+      <TwoFactorSheet
+        open={twoFactorOpen}
+        onClose={() => setTwoFactorOpen(false)}
       />
 
       <Sheet
