@@ -412,3 +412,57 @@
     gap: 10px;
   }
 }
+
+// Lista dello sheet "Passkey".
+.passkey-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: v.$tap-target;
+    padding: 10px 12px;
+    border-radius: v.$r-inner;
+    background: v.$surface-2;
+
+    > .ph-fingerprint {
+      font-size: 20px;
+      color: v.$accent;
+    }
+  }
+
+  &__text {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__name {
+    font-size: 14.5px;
+    font-weight: 600;
+  }
+
+  &__meta {
+    font-size: 12px;
+    color: v.$muted;
+  }
+
+  &__remove {
+    flex: 0 0 auto;
+    width: v.$tap-target;
+    height: v.$tap-target;
+    margin-right: -8px;
+    border: 0;
+    background: transparent;
+    color: v.$negative;
+    cursor: pointer;
+  }
+}

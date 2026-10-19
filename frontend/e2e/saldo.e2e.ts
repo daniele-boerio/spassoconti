@@ -36,7 +36,7 @@ test("login → nuova spesa → saldo del conto aggiornato", async ({ page, requ
   await page.goto("/");
   await page.getByRole("textbox", { name: "Nome utente o email" }).fill(username);
   await page.getByRole("textbox", { name: "Password" }).fill(PASSWORD);
-  await page.getByRole("button", { name: "Accedi" }).click();
+  await page.getByRole("button", { name: "Accedi", exact: true }).click();
   const nuova = page.getByRole("button", { name: "Nuova transazione" });
   await expect(nuova).toBeVisible();
 

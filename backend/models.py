@@ -8,6 +8,7 @@ from sqlalchemy import (
     Boolean,
     Date,
     Index,
+    LargeBinary,
     UniqueConstraint,
 )
 from sqlalchemy.orm import relationship, backref
@@ -80,6 +81,50 @@ class RecoveryCode(Base):
     code_hash = Column(String(64), nullable=False)
     used_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+
+
+class Passkey(Base):
+    """Passkey (WebAuthn): accesso con Face ID / impronta / PIN del dispositivo.
+
+    In DB c'è solo la chiave PUBBLICA: la privata non lascia mai il
+    dispositivo (o il portachiavi iCloud/Google che la sincronizza).
+    `credential_id` (base64url) identifica la passkey al login, quando ancora
+    non si sa chi sia l'utente: per questo è unico su tutta la tabella.
+    """
+
+    __tablename__ = "passkeys"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    credential_id = Column(String, nullable=False, unique=True)
+    public_key = Column(LargeBinary, nullable=False)
+    sign_count = Column(Integer, nullable=False, default=0)
+    # "usb,nfc,internal,hybrid…": suggerimenti al browser su come raggiungerla.
+    transports = Column(String, nullable=True)
+    nome = Column(String, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    last_used_at = Column(DateTime, nullable=True)
+
+
+class WebauthnChallenge(Base):
+    """La sfida di una cerimonia WebAuthn in corso (registrazione o login).
+
+    Vive pochi minuti e si cancella quando viene usata: una risposta firmata
+    intercettata non si può ripresentare (le passkey sincronizzate hanno
+    `sign_count` sempre a 0, quindi il contatore da solo non basta).
+    """
+
+    __tablename__ = "webauthn_challenges"
+
+    id = Column(Integer, primary_key=True, index=True)
+    challenge = Column(String, nullable=False, unique=True)
+    # "registrazione" | "login"
+    tipo = Column(String, nullable=False)
+    # Valorizzato per la registrazione (utente loggato); al login non si sa ancora.
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    expires_at = Column(DateTime, nullable=False)
 
 
 class PushSubscription(Base):

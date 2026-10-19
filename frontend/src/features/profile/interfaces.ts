@@ -30,6 +30,14 @@ export interface RecoveryCodesResponse {
   recovery_codes: string[];
 }
 
+/** Una passkey registrata (Face ID, impronta, PIN del dispositivo). */
+export interface Passkey {
+  id: number;
+  nome: string;
+  created_at: string;
+  last_used_at: string | null;
+}
+
 export interface DisableTwoFactorParams {
   password: string;
   code: string;
@@ -68,6 +76,8 @@ export interface ProfileState {
   mfaToken: string | null;
   /** Stato della 2FA dell'account; null finché non è stato chiesto. */
   twoFactor: TwoFactorStatus | null;
+  /** Passkey dell'account; null finché non sono state chieste. */
+  passkeys: Passkey[] | null;
 }
 
 export interface ProfileResponse {

@@ -45,6 +45,7 @@ from routers import (
     bank_proposals,
     open_banking,
     two_factor,
+    passkey,
     notifiche,
 )
 
@@ -248,6 +249,7 @@ api.include_router(open_banking.router)  # Open Banking (GoCardless) requisition
 api.include_router(debiti.router)  # Debiti
 api.include_router(auth.router)  # Endpoint per forgot-password e reset-password
 api.include_router(two_factor.router)  # Verifica in due passaggi (/auth/2fa)
+api.include_router(passkey.router)  # Passkey / accesso biometrico (/auth/passkey)
 api.include_router(notifiche.router)  # Notifiche push
 
 

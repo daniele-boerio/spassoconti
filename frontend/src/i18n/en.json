@@ -689,5 +689,16 @@
   "two_factor_use_app": "Use the app code",
   "two_factor_use_recovery": "No phone? Use a recovery code",
   "two_factor_verify": "Verify",
-  "notifications_failed": "The browser couldn’t turn them on: try again later"
+  "notifications_failed": "The browser couldn’t turn them on: try again later",
+
+  "passkey_login": "Sign in with a passkey",
+  "passkey_title": "Passkeys",
+  "passkey_row_hint": "Sign in with Face ID or fingerprint, no password",
+  "passkey_intro": "With a passkey you sign in with Face ID, fingerprint or your device PIN: no password to type, and it doesn’t work on fake sites. On iPhone it syncs with iCloud Keychain.",
+  "passkey_add": "Add a passkey",
+  "passkey_added": "Passkey added",
+  "passkey_removed": "Passkey deleted",
+  "passkey_remove": "Delete",
+  "passkey_created": "Added on",
+  "passkey_last_used": "Last used on"
 }

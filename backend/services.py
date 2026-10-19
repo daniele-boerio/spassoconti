@@ -782,8 +782,21 @@ def task_pulizia_refresh_token():
             .filter(models.RefreshToken.expires_at < soglia)
             .delete(synchronize_session=False)
         )
+        # Sfide WebAuthn mai usate (cerimonia passkey abbandonata a metà).
+        sfide = (
+            db.query(models.WebauthnChallenge)
+            .filter(
+                models.WebauthnChallenge.expires_at
+                < datetime.now(timezone.utc).replace(tzinfo=None)
+            )
+            .delete(synchronize_session=False)
+        )
         db.commit()
-        logger.info("Pulizia refresh token: %s righe cancellate", cancellati)
+        logger.info(
+            "Pulizia refresh token: %s righe cancellate (+%s sfide WebAuthn)",
+            cancellati,
+            sfide,
+        )
     except Exception:
         db.rollback()
         logger.exception("Pulizia dei refresh token fallita")

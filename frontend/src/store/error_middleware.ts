@@ -13,6 +13,7 @@ const CREDENTIAL_THUNKS = [
   "profile/login/",
   "profile/register/",
   "profile/verifyTwoFactor/",
+  "profile/loginWithPasskey/",
 ];
 
 const titleKey = (status: number): string => {

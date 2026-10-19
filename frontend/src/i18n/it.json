@@ -687,5 +687,16 @@
   "two_factor_use_app": "Usa il codice dell’app",
   "two_factor_use_recovery": "Non hai il telefono? Usa un codice di recupero",
   "two_factor_verify": "Verifica",
-  "notifications_failed": "Il browser non è riuscito ad attivarle: riprova più tardi"
+  "notifications_failed": "Il browser non è riuscito ad attivarle: riprova più tardi",
+
+  "passkey_login": "Entra con una passkey",
+  "passkey_title": "Passkey",
+  "passkey_row_hint": "Entra con Face ID o impronta, senza password",
+  "passkey_intro": "Con una passkey entri con Face ID, impronta o il PIN del dispositivo: niente password da scrivere, e non funziona su siti falsi. Su iPhone si sincronizza col portachiavi iCloud.",
+  "passkey_add": "Aggiungi una passkey",
+  "passkey_added": "Passkey aggiunta",
+  "passkey_removed": "Passkey eliminata",
+  "passkey_remove": "Elimina",
+  "passkey_created": "Aggiunta il",
+  "passkey_last_used": "Usata l’ultima volta il"
 }

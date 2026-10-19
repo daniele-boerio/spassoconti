@@ -9,6 +9,7 @@ APScheduler==3.11.2
 attrs==26.1.0
 bcrypt==5.0.0
 beautifulsoup4==4.14.3
+cbor2==6.1.5
 certifi==2026.1.4
 cffi==2.0.0
 charset-normalizer==3.4.4
@@ -40,10 +41,13 @@ propcache==0.5.4
 protobuf==7.36.2
 psycopg2-binary==2.9.11
 py-vapid==1.9.6
+pyasn1-modules==0.4.2
+pyasn1==0.6.4
 pycparser==3.11
 pydantic==2.12.5
 pydantic_core==2.41.5
 PyJWT==2.15.1
+pyOpenSSL==26.4.0
 pyotp==2.10.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.4
@@ -62,6 +66,7 @@ tzdata==2026.5
 tzlocal==5.3.1
 urllib3==2.8.0
 uvicorn==0.40.0
+webauthn==3.0.1
 websockets==15.0.1
 yarl==1.25.1
 yfinance==1.7.0

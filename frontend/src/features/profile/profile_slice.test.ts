@@ -24,7 +24,15 @@ vi.hoisted(() => {
 });
 
 import reducer, { cancelTwoFactor, selectLastTagId } from "./profile_slice";
-import { getProfile, login, logout, verifyTwoFactor } from "./api_calls";
+import {
+  addPasskey,
+  deletePasskey,
+  getProfile,
+  login,
+  loginWithPasskey,
+  logout,
+  verifyTwoFactor,
+} from "./api_calls";
 import { ProfileResponse } from "./interfaces";
 import { createTransaction } from "../transactions/api_calls";
 import { Transaction } from "../transactions/interfaces";
@@ -228,5 +236,45 @@ describe("profile_slice — login con la verifica in due passaggi", () => {
     const waiting = reducer(initial, loginNeedsCode);
 
     expect(reducer(waiting, cancelTwoFactor()).mfaToken).toBeNull();
+  });
+});
+
+describe("profile_slice — accesso con passkey", () => {
+  it("pannello di Face ID chiuso (null): si resta sulla schermata di accesso", () => {
+    const state = reducer(initial, loginWithPasskey.fulfilled(null, "req", undefined));
+
+    expect(state.isAuthenticated).toBe(initial.isAuthenticated);
+    expect(state.token).toBe(initial.token);
+  });
+
+  it("passkey verificata: sessione aperta", () => {
+    const state = reducer(
+      initial,
+      loginWithPasskey.fulfilled(
+        { access_token: "access", username: "mario" },
+        "req",
+        undefined,
+      ),
+    );
+
+    expect(state.isAuthenticated).toBe(true);
+    expect(state.token).toBe("access");
+  });
+
+  it("la lista segue aggiunte ed eliminazioni, e sparisce al logout", () => {
+    const passkey = {
+      id: 7,
+      nome: "iPhone",
+      created_at: "2026-10-19T10:00:00",
+      last_used_at: null,
+    };
+    let state = reducer(initial, addPasskey.fulfilled(passkey, "req", undefined));
+    expect(state.passkeys).toEqual([passkey]);
+
+    state = reducer(state, deletePasskey.fulfilled(7, "req", 7));
+    expect(state.passkeys).toEqual([]);
+
+    state = reducer(state, logout.fulfilled(undefined, "req", undefined));
+    expect(state.passkeys).toBeNull();
   });
 });

@@ -5,6 +5,7 @@ import {
   AuthResponse,
   DisableTwoFactorParams,
   LoginParams,
+  Passkey,
   ProfileResponse,
   RecoveryCodesResponse,
   RegisterParams,
@@ -13,6 +14,12 @@ import {
   VerifyTwoFactorParams,
 } from "./interfaces";
 import { forgetThisDevice } from "../notifiche/api_calls";
+import {
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+  startAuthentication,
+  startRegistration,
+} from "@simplewebauthn/browser";
 
 export const login = createAsyncThunk<AuthResponse, LoginParams>(
   "profile/login",
@@ -226,6 +233,110 @@ export const regenerateRecoveryCodes = createAsyncThunk<RecoveryCodesResponse, s
     } catch (error) {
       const err = error as AxiosError;
       return rejectWithValue(err.response?.data || "Errore codici di recupero");
+    }
+  },
+);
+
+// --- PASSKEY ------------------------------------------------------------------
+//
+// L'utente che chiude il pannello di Face ID (o non ha passkey per il sito) non
+// ha avuto un errore: il browser lancia NotAllowedError e il thunk risolve con
+// null, senza finestre rosse.
+
+const isCancelled = (error: unknown) =>
+  error instanceof Error &&
+  (error.name === "NotAllowedError" || error.name === "AbortError");
+
+type PasskeyOptions<T> = { options: T };
+
+/** Accesso con passkey: niente username, è il dispositivo a proporre le passkey del sito. */
+export const loginWithPasskey = createAsyncThunk<AuthResponse | null, void>(
+  "profile/loginWithPasskey",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post<
+        PasskeyOptions<PublicKeyCredentialRequestOptionsJSON>
+      >("/auth/passkey/login/options", null, { _skipAuthRefresh: true });
+
+      let credential;
+      try {
+        credential = await startAuthentication({ optionsJSON: data.options });
+      } catch (error) {
+        if (isCancelled(error)) return null;
+        throw error;
+      }
+
+      const response = await api.post<AuthResponse>(
+        "/auth/passkey/login/verify",
+        { credential },
+        { _skipAuthRefresh: true },
+      );
+      return response.data;
+    } catch (error) {
+      const err = error as AxiosError;
+      return rejectWithValue(
+        err.response?.data || err.message || "Errore accesso con passkey",
+      );
+    }
+  },
+);
+
+export const getPasskeys = createAsyncThunk<Passkey[], void>(
+  "profile/getPasskeys",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.get<Passkey[]>("/auth/passkey");
+      return response.data;
+    } catch (error) {
+      const err = error as AxiosError;
+      return rejectWithValue(err.response?.data || "Errore lettura passkey");
+    }
+  },
+);
+
+/** Crea una passkey su questo dispositivo (chiede Face ID / impronta / PIN). */
+export const addPasskey = createAsyncThunk<Passkey | null, void>(
+  "profile/addPasskey",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post<
+        PasskeyOptions<PublicKeyCredentialCreationOptionsJSON>
+      >("/auth/passkey/register/options");
+
+      let credential;
+      try {
+        credential = await startRegistration({ optionsJSON: data.options });
+      } catch (error) {
+        // Anche "esiste già una passkey per questo account su questo
+        // dispositivo" (InvalidStateError) non è un errore da finestra rossa.
+        if (isCancelled(error) || (error as Error)?.name === "InvalidStateError") {
+          return null;
+        }
+        throw error;
+      }
+
+      const response = await api.post<Passkey>("/auth/passkey/register/verify", {
+        credential,
+      });
+      return response.data;
+    } catch (error) {
+      const err = error as AxiosError;
+      return rejectWithValue(
+        err.response?.data || err.message || "Errore creazione passkey",
+      );
+    }
+  },
+);
+
+export const deletePasskey = createAsyncThunk<number, number>(
+  "profile/deletePasskey",
+  async (id, { rejectWithValue }) => {
+    try {
+      await api.delete(`/auth/passkey/${id}`);
+      return id;
+    } catch (error) {
+      const err = error as AxiosError;
+      return rejectWithValue(err.response?.data || "Errore eliminazione passkey");
     }
   },
 );

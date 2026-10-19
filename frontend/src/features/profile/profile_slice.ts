@@ -1,10 +1,14 @@
 import { createSlice, PayloadAction, Action } from "@reduxjs/toolkit";
 import {
+  addPasskey,
+  deletePasskey,
   disableTwoFactor,
   enableTwoFactor,
+  getPasskeys,
   getProfile,
   getTwoFactorStatus,
   login,
+  loginWithPasskey,
   logout,
   regenerateRecoveryCodes,
   register,
@@ -35,6 +39,7 @@ const initialState: ProfileState = {
   lastTagId: null,
   mfaToken: null,
   twoFactor: null,
+  passkeys: null,
 };
 
 // --- HELPERS ---
@@ -72,6 +77,7 @@ const profileSlice = createSlice({
       state.isOpenBankingAdmin = false;
       state.lastTagId = null;
       state.twoFactor = null;
+      state.passkeys = null;
       localStorage.removeItem("token");
       localStorage.removeItem("username");
     },
@@ -108,6 +114,24 @@ const profileSlice = createSlice({
         if ((action.payload as { status?: number } | undefined)?.status === 401) {
           state.mfaToken = null;
         }
+      })
+
+      // null = pannello chiuso dall'utente: si resta sulla schermata di accesso.
+      .addCase(loginWithPasskey.fulfilled, (state, action) => {
+        if (action.payload) signIn(state, action.payload);
+      })
+      .addCase(getPasskeys.fulfilled, (state, action) => {
+        state.passkeys = action.payload;
+      })
+      .addCase(addPasskey.fulfilled, (state, action) => {
+        if (action.payload) {
+          state.passkeys = [...(state.passkeys ?? []), action.payload];
+        }
+      })
+      .addCase(deletePasskey.fulfilled, (state, action) => {
+        state.passkeys = (state.passkeys ?? []).filter(
+          (passkey) => passkey.id !== action.payload,
+        );
       })
 
       .addCase(getTwoFactorStatus.fulfilled, (state, action) => {
@@ -208,6 +232,7 @@ const profileSlice = createSlice({
         state.isOpenBankingAdmin = false;
         state.lastTagId = null;
         state.twoFactor = null;
+        state.passkeys = null;
 
         localStorage.removeItem("token");
         localStorage.removeItem("username");
@@ -235,6 +260,8 @@ export const { setLogout, cancelTwoFactor } = profileSlice.actions;
 export const selectMfaToken = (state: RootState) => state.profile.mfaToken;
 
 export const selectTwoFactor = (state: RootState) => state.profile.twoFactor;
+
+export const selectPasskeys = (state: RootState) => state.profile.passkeys;
 
 export const selectProfileLoading = (state: RootState) => state.profile.loading;
 

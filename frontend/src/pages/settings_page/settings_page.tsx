@@ -17,10 +17,16 @@ import type { ThemePreference } from "../../features/ui/theme";
 import {
   selectProfileEmail,
   selectProfileUsername,
+  selectPasskeys,
   selectTwoFactor,
 } from "../../features/profile/profile_slice";
-import { getTwoFactorStatus, logout } from "../../features/profile/api_calls";
+import {
+  getPasskeys,
+  getTwoFactorStatus,
+  logout,
+} from "../../features/profile/api_calls";
 import NotificationsSection from "./notifications_section";
+import PasskeySheet from "./passkey_sheet";
 import TwoFactorSheet from "./two_factor_sheet";
 import {
   getConti,
@@ -61,6 +67,8 @@ export default function SettingsPage() {
 
   const [importOpen, setImportOpen] = useState(false);
   const [twoFactorOpen, setTwoFactorOpen] = useState(false);
+  const [passkeyOpen, setPasskeyOpen] = useState(false);
+  const passkeys = useAppSelector(selectPasskeys);
   const [budgetSheetOpen, setBudgetSheetOpen] = useState(false);
   const [budgetDraft, setBudgetDraft] = useState("");
   const [budgetInvalid, setBudgetInvalid] = useState(false);
@@ -71,6 +79,7 @@ export default function SettingsPage() {
     // "Banche collegate" conta i conti con un collegamento attivo.
     dispatch(getConti());
     dispatch(getTwoFactorStatus());
+    dispatch(getPasskeys());
   }, [dispatch]);
 
   const linkedAccounts = conti.filter(
@@ -269,6 +278,22 @@ export default function SettingsPage() {
               </span>
               <i className="ph-bold ph-caret-right" aria-hidden="true" />
             </button>
+
+            <button
+              type="button"
+              className="settings-row settings-row--tappable"
+              onClick={() => setPasskeyOpen(true)}
+            >
+              <span className="settings-row__text">
+                <span className="settings-row__label">{t("passkey_title")}</span>
+                <span className="settings-row__hint">{t("passkey_row_hint")}</span>
+              </span>
+
+              {passkeys !== null && (
+                <span className="settings-row__value">{passkeys.length}</span>
+              )}
+              <i className="ph-bold ph-caret-right" aria-hidden="true" />
+            </button>
           </div>
         </section>
 
@@ -291,6 +316,8 @@ export default function SettingsPage() {
         open={twoFactorOpen}
         onClose={() => setTwoFactorOpen(false)}
       />
+
+      <PasskeySheet open={passkeyOpen} onClose={() => setPasskeyOpen(false)} />
 
       <Sheet
         open={budgetSheetOpen}

@@ -16,6 +16,12 @@ from .user import (
     TwoFactorSetup,
     RecoveryCodesOut,
 )
+from .passkey import (
+    PasskeyOut,
+    PasskeyOptionsOut,
+    PasskeyRegisterVerify,
+    PasskeyLoginVerify,
+)
 from .notifica import (
     NotificheOut,
     NotifichePreferenze,

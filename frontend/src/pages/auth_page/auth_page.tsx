@@ -1,6 +1,8 @@
 import React, { useState } from "react";
+import { browserSupportsWebAuthn } from "@simplewebauthn/browser";
 import {
   login,
+  loginWithPasskey,
   register,
   verifyTwoFactor,
 } from "../../features/profile/api_calls";
@@ -28,6 +30,8 @@ export default function AuthPage() {
   const loading = useAppSelector(selectProfileLoading);
   const mfaToken = useAppSelector(selectMfaToken);
   const dispatch = useAppDispatch();
+  // Browser senza WebAuthn (molto vecchi): il pulsante non compare.
+  const [passkeySupported] = useState(browserSupportsWebAuthn);
 
   // Password giusta, account con la verifica in due passaggi: manca il codice.
   if (mfaToken) return <TwoFactorStep mfaToken={mfaToken} />;
@@ -126,6 +130,18 @@ export default function AuthPage() {
           <Button type="submit" block disabled={!canSubmit || loading}>
             {isLogin ? t("login") : t("sign_in")}
           </Button>
+
+          {isLogin && passkeySupported && (
+            <Button
+              variant="neutral"
+              block
+              icon="ph-bold ph-fingerprint"
+              disabled={loading}
+              onClick={() => dispatch(loginWithPasskey())}
+            >
+              {t("passkey_login")}
+            </Button>
+          )}
 
           <p className="auth__switch">
             {isLogin ? t("no_account") : t("account")}{" "}
