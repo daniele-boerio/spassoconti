@@ -711,5 +711,18 @@
   "admin_banned_toast": "Utente bannato",
   "admin_unbanned": "Utente riattivato",
   "error_account_disabled": "Questo account è stato disattivato dall’amministratore.",
-  "error_registration_closed": "Le registrazioni sono chiuse."
+  "error_registration_closed": "Le registrazioni sono chiuse.",
+
+  "install_title": "Installa SpassoConto",
+  "install_intro": "Aggiungila alla schermata Home: si apre a schermo intero come un’app, più veloce e anche senza rete.",
+  "install_action": "Installa",
+  "install_later": "Non ora",
+  "install_got_it": "Ho capito",
+  "install_share": "Condividi",
+  "install_menu": "Menu",
+  "install_ios_step_share": "Tocca Condividi nella barra del browser",
+  "install_ios_step_add": "Scorri e scegli “Aggiungi alla schermata Home”",
+  "install_ios_step_confirm": "Tocca “Aggiungi” in alto a destra",
+  "install_android_step_menu": "Apri il menu del browser",
+  "install_android_step_add": "Scegli “Installa app” o “Aggiungi a schermata Home”"
 }

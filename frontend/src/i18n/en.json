@@ -713,5 +713,18 @@
   "admin_banned_toast": "User banned",
   "admin_unbanned": "User reactivated",
   "error_account_disabled": "This account has been disabled by the administrator.",
-  "error_registration_closed": "Registration is closed."
+  "error_registration_closed": "Registration is closed.",
+
+  "install_title": "Install SpassoConto",
+  "install_intro": "Add it to your home screen: it opens full screen like an app, faster and even offline.",
+  "install_action": "Install",
+  "install_later": "Not now",
+  "install_got_it": "Got it",
+  "install_share": "Share",
+  "install_menu": "Menu",
+  "install_ios_step_share": "Tap Share in the browser bar",
+  "install_ios_step_add": "Scroll down and choose “Add to Home Screen”",
+  "install_ios_step_confirm": "Tap “Add” in the top right corner",
+  "install_android_step_menu": "Open the browser menu",
+  "install_android_step_add": "Choose “Install app” or “Add to Home screen”"
 }

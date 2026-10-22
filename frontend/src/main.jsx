@@ -15,6 +15,7 @@ import "primeicons/primeicons.css";
 import "@phosphor-icons/web/bold";
 
 import PrimeReact from "primereact/api";
+import { listenForInstallPrompt } from "./features/ui/install";
 
 // Dove PrimeReact appoggia i suoi overlay nella pila.
 //
@@ -74,6 +75,10 @@ store.subscribe(() => {
 // nessuno che lo catturi fa smontare a React l'intera radice, e `#root` resta
 // un div vuoto. Cioè la schermata bianca da cui, con l'app in home su iPhone,
 // si esce solo chiudendo e riaprendo.
+// Prima di montare: Chrome emette `beforeinstallprompt` presto e un listener
+// aggiunto dopo lo perderebbe (vedi features/ui/install).
+listenForInstallPrompt();
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <Provider store={store}>

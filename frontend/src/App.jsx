@@ -19,6 +19,7 @@ import { ConfirmPopup } from "primereact/confirmpopup";
 import BankProposalsGate from "./components/bank_proposals_gate/bank_proposals_gate";
 import SheetHost from "./components/sheet_host/sheet_host";
 import ToastHost from "./components/toast/toast";
+import InstallPrompt from "./components/install_prompt/install_prompt";
 import { useThemeSync } from "./features/ui/use_theme";
 import { useOfflineSync } from "./features/transactions/use_offline_sync";
 import { syncThisDevice } from "./features/notifiche/api_calls";
@@ -188,6 +189,8 @@ function App() {
       </div>
       <ConfirmPopup />
       <ErrorDialog />
+      {/* Dal browser del telefono: invito ad aggiungere l'app alla Home. */}
+      <InstallPrompt />
     </Router>
   );
 }
