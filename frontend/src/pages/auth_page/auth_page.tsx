@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { browserSupportsWebAuthn } from "@simplewebauthn/browser";
 import {
+  getRegistrationStatus,
   login,
   loginWithPasskey,
   register,
@@ -14,13 +15,14 @@ import {
   cancelTwoFactor,
   selectMfaToken,
   selectProfileLoading,
+  selectRegistrationOpen,
 } from "../../features/profile/profile_slice";
 import ForgotPasswordDialog from "../../components/dialog/forgot_password_dialog/forgot_password_dialog";
 
 export default function AuthPage() {
   const { t } = useI18n();
 
-  const [isLogin, setIsLogin] = useState(true);
+  const [loginMode, setLoginMode] = useState(true);
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -32,6 +34,13 @@ export default function AuthPage() {
   const dispatch = useAppDispatch();
   // Browser senza WebAuthn (molto vecchi): il pulsante non compare.
   const [passkeySupported] = useState(browserSupportsWebAuthn);
+  // Iscrizioni chiuse dal server (REGISTRATION_ENABLED=false): resta solo l'accesso.
+  const registrationOpen = useAppSelector(selectRegistrationOpen);
+  const isLogin = loginMode || !registrationOpen;
+
+  useEffect(() => {
+    dispatch(getRegistrationStatus());
+  }, [dispatch]);
 
   // Password giusta, account con la verifica in due passaggi: manca il codice.
   if (mfaToken) return <TwoFactorStep mfaToken={mfaToken} />;
@@ -143,12 +152,14 @@ export default function AuthPage() {
             </Button>
           )}
 
-          <p className="auth__switch">
-            {isLogin ? t("no_account") : t("account")}{" "}
-            <button type="button" onClick={() => setIsLogin(!isLogin)}>
-              {isLogin ? t("sign_in") : t("login")}
-            </button>
-          </p>
+          {registrationOpen && (
+            <p className="auth__switch">
+              {isLogin ? t("no_account") : t("account")}{" "}
+              <button type="button" onClick={() => setLoginMode(!isLogin)}>
+                {isLogin ? t("sign_in") : t("login")}
+              </button>
+            </p>
+          )}
         </div>
       </form>
 

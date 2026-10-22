@@ -15,6 +15,8 @@ from .user import (
     TwoFactorStatus,
     TwoFactorSetup,
     RecoveryCodesOut,
+    RegistrationStatus,
+    AdminUserOut,
 )
 from .passkey import (
     PasskeyOut,

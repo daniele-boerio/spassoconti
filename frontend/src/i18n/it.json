@@ -698,5 +698,18 @@
   "passkey_removed": "Passkey eliminata",
   "passkey_remove": "Elimina",
   "passkey_created": "Aggiunta il",
-  "passkey_last_used": "Usata l’ultima volta il"
+  "passkey_last_used": "Usata l’ultima volta il",
+
+  "admin_users_title": "Utenti",
+  "admin_you": "Tu",
+  "admin_banned": "Bannato",
+  "admin_ban": "Banna utente",
+  "admin_unban": "Riattiva utente",
+  "admin_ban_hint": "Non potrà più entrare e verrà disconnesso da tutti i dispositivi. Il profilo e le transazioni restano: puoi riattivarlo quando vuoi.",
+  "admin_banned_since": "Bannato dal",
+  "admin_unban_hint": "Riattivandolo potrà di nuovo entrare con le sue credenziali.",
+  "admin_banned_toast": "Utente bannato",
+  "admin_unbanned": "Utente riattivato",
+  "error_account_disabled": "Questo account è stato disattivato dall’amministratore.",
+  "error_registration_closed": "Le registrazioni sono chiuse."
 }

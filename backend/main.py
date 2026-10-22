@@ -29,6 +29,7 @@ from services import (
     task_promemoria_ricorrenze,
 )
 from routers import (
+    admin,
     auth,
     conti,
     categorie,
@@ -251,6 +252,7 @@ api.include_router(auth.router)  # Endpoint per forgot-password e reset-password
 api.include_router(two_factor.router)  # Verifica in due passaggi (/auth/2fa)
 api.include_router(passkey.router)  # Passkey / accesso biometrico (/auth/passkey)
 api.include_router(notifiche.router)  # Notifiche push
+api.include_router(admin.router)  # Admin: lista utenti e ban
 
 
 # Il healthcheck del container. Tocca il database apposta: un BE che risponde ma

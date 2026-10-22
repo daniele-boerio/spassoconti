@@ -38,6 +38,13 @@ def register_user(
     response: Response,
     db: Session = Depends(get_db),
 ):
+    # Iscrizioni chiuse da REGISTRATION_ENABLED=false (vedi auth.registrazione_aperta)
+    if not auth.registrazione_aperta():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Registration is currently closed",
+        )
+
     # Controllo campi obbligatori
     if not user.username or not user.password or not user.email:
         raise HTTPException(
@@ -157,6 +164,9 @@ def login(
             detail="Invalid credentials",
         )
 
+    # Un utente bannato non arriva nemmeno al secondo passo della 2FA.
+    auth.verifica_non_bannato(db, user)
+
     # Verifica in due passaggi: la password giusta non basta. Niente sessione né
     # cookie, solo un token a 5 minuti da ripresentare col codice a
     # POST /auth/2fa/verify.
@@ -191,6 +201,7 @@ def get_me(
 
     response = UserResponse.model_validate(user)
     response.is_open_banking_admin = is_open_banking_admin
+    response.is_admin = auth.is_admin(user)
     return response
 
 

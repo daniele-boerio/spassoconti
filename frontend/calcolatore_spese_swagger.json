@@ -5376,6 +5376,28 @@
         }
       }
     },
+    "/api/auth/registration": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Registration Status",
+        "description": "Pubblico: la pagina di login lo legge per mostrare o no \"Registrati\".",
+        "operationId": "registration_status_api_auth_registration_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/forgot-password": {
       "post": {
         "tags": [
@@ -6149,10 +6171,178 @@
           }
         ]
       }
+    },
+    "/api/admin/users": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "List Users",
+        "description": "Tutti gli utenti registrati, bannati compresi, dal più vecchio.",
+        "operationId": "list_users_api_admin_users_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AdminUserOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Users Api Admin Users Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/admin/users/{user_id}/ban": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Ban User",
+        "description": "Blocca l'accesso e chiude subito tutte le sessioni dell'utente.\n\n- refresh token revocati: nessun dispositivo rinnova la sessione;\n- token_version +1: gli access token già emessi smettono di valere ora,\n  non alla loro scadenza naturale (stesso meccanismo di /auth/logout-all).",
+        "operationId": "ban_user_api_admin_users__user_id__ban_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{user_id}/unban": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Unban User",
+        "description": "Toglie il ban: l'utente rientra con le sue credenziali di sempre.",
+        "operationId": "unban_user_api_admin_users__user_id__unban_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AdminUserOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "banned_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Banned At"
+          },
+          "is_admin": {
+            "type": "boolean",
+            "title": "Is Admin",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "email"
+        ],
+        "title": "AdminUserOut",
+        "description": "Un utente come lo vede l'admin nella lista delle impostazioni."
+      },
       "BankAuthStart": {
         "properties": {
           "conto_id": {
@@ -8460,6 +8650,20 @@
         ],
         "title": "RecoveryCodesOut"
       },
+      "RegistrationStatus": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "title": "RegistrationStatus",
+        "description": "Se le iscrizioni sono aperte (REGISTRATION_ENABLED): il FE nasconde il\nlink \"Registrati\" quando non lo sono."
+      },
       "ResetPasswordRequest": {
         "properties": {
           "token": {
@@ -10088,6 +10292,11 @@
           "is_open_banking_admin": {
             "type": "boolean",
             "title": "Is Open Banking Admin",
+            "default": false
+          },
+          "is_admin": {
+            "type": "boolean",
+            "title": "Is Admin",
             "default": false
           },
           "last_tag_id": {

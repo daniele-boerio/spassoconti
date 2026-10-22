@@ -64,6 +64,12 @@ class User(Base):
     notifica_budget = Column(Boolean, nullable=False, default=True)
     notifica_ricorrenze = Column(Boolean, nullable=False, default=True)
 
+    # --- Ban dall'admin ---
+    # Valorizzato = l'utente non entra più (login, 2FA, passkey, refresh). Il
+    # profilo e i dati restano: togliere il ban (NULL) li rende di nuovo
+    # accessibili. Vedi routers/admin.py.
+    banned_at = Column(DateTime, nullable=True)
+
 
 class RecoveryCode(Base):
     """Codice di recupero della verifica in due passaggi: vale una volta sola.

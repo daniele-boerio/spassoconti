@@ -45,6 +45,10 @@ services:
       # Vuoto = cookie legato al solo host (vedi backend/.env.example).
       - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
       - FRONTEND_URL=${FRONTEND_URL:-https://conti.spassocasa.it}
+      # Admin (lista utenti e ban nelle impostazioni). Vuota = OPEN_BANKING_ADMIN_EMAIL.
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+      # "false" chiude le nuove iscrizioni; chi ha già un account continua a entrare.
+      - REGISTRATION_ENABLED=${REGISTRATION_ENABLED:-true}
       # Lo scheduler gira in-process: un solo backend deve averlo acceso.
       - RUN_SCHEDULER=${RUN_SCHEDULER:-true}
       # Open Banking (connessione automatica dei conti, solo l'utente admin): oggi

@@ -50,6 +50,13 @@ def create_xxx(
   missing user filter is a data-leak bug — never omit it. That includes lookups of
   related rows (destination conto, parent transaction, categoria/sottocategoria/tag —
   see `resolve_tassonomia` in `routers/transazioni.py`).
+  The one deliberate exception is `routers/admin.py` (user list, ban/unban), gated
+  by `auth.get_app_admin_user_id` (`ADMIN_EMAIL`, falling back to
+  `OPEN_BANKING_ADMIN_EMAIL`).
+- **Banned users (`User.banned_at`)** cannot get a session: the check lives in
+  `auth.apri_sessione` (login, 2FA, passkey), `/auth/refresh` and
+  `get_current_user_id`. A new way to open a session must go through
+  `apri_sessione`. `REGISTRATION_ENABLED=false` closes `/register` only.
 - **Soft-delete:** `Conto` and `Transazione` carry `deleted_at`. Reads and aggregates
   filter `deleted_at.is_(None)`; deleting a conto is a reversible soft-delete, never
   a hard cascade.

@@ -17,7 +17,7 @@ from fastapi import (
 from sqlalchemy.orm import Session
 from database import get_db
 from models import User
-from schemas import ForgotPasswordRequest, ResetPasswordRequest, Token
+from schemas import ForgotPasswordRequest, RegistrationStatus, ResetPasswordRequest, Token
 from rate_limit import limiter
 
 import auth as auth_utils
@@ -78,6 +78,12 @@ def _hash_reset_token(token: str) -> str:
     # Come per i refresh token: in DB solo l'impronta, così un dump del database
     # non regala link di reset validi per i 30 minuti successivi.
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+@router.get("/registration", response_model=RegistrationStatus)
+def registration_status():
+    """Pubblico: la pagina di login lo legge per mostrare o no "Registrati"."""
+    return {"enabled": auth_utils.registrazione_aperta()}
 
 
 @router.post("/forgot-password")
@@ -180,7 +186,9 @@ def refresh_access_token(
     db_token = auth_utils.consume_refresh_token(db, raw_token)
 
     user = db.query(User).filter(User.id == db_token.user_id).first()
-    if not user:
+    # Il ban revoca già i refresh token; questo copre un ban scritto a mano in DB.
+    if not user or user.banned_at is not None:
+        db.rollback()
         auth_utils.clear_refresh_cookie(response)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

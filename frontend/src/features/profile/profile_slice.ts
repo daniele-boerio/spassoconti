@@ -6,6 +6,7 @@ import {
   enableTwoFactor,
   getPasskeys,
   getProfile,
+  getRegistrationStatus,
   getTwoFactorStatus,
   login,
   loginWithPasskey,
@@ -36,6 +37,8 @@ const initialState: ProfileState = {
   // ancora se vale.
   restoring: !!savedToken,
   isOpenBankingAdmin: false,
+  isAdmin: false,
+  registrationOpen: true,
   lastTagId: null,
   mfaToken: null,
   twoFactor: null,
@@ -75,6 +78,7 @@ const profileSlice = createSlice({
       state.username = null;
       state.isAuthenticated = false;
       state.isOpenBankingAdmin = false;
+      state.isAdmin = false;
       state.lastTagId = null;
       state.twoFactor = null;
       state.passkeys = null;
@@ -171,6 +175,7 @@ const profileSlice = createSlice({
           state.email = action.payload.email;
           state.isOpenBankingAdmin =
             action.payload.is_open_banking_admin ?? false;
+          state.isAdmin = action.payload.is_admin ?? false;
           // Il BE lo espone come intero: lo normalizziamo a stringa perché è
           // così che gli id della tassonomia viaggiano nel resto del FE.
           state.lastTagId =
@@ -183,6 +188,7 @@ const profileSlice = createSlice({
       .addCase(getProfile.rejected, (state) => {
         state.isAuthenticated = false;
         state.isOpenBankingAdmin = false;
+        state.isAdmin = false;
         state.lastTagId = null;
 
         localStorage.removeItem("token");
@@ -230,12 +236,17 @@ const profileSlice = createSlice({
         state.email = null;
         state.isAuthenticated = false;
         state.isOpenBankingAdmin = false;
+        state.isAdmin = false;
         state.lastTagId = null;
         state.twoFactor = null;
         state.passkeys = null;
 
         localStorage.removeItem("token");
         localStorage.removeItem("username");
+      })
+
+      .addCase(getRegistrationStatus.fulfilled, (state, action) => {
+        state.registrationOpen = action.payload;
       })
 
       // Matchers per caricamento ed errori del modulo profile
@@ -278,6 +289,11 @@ export const selectProfileIsAuthenticated = (state: RootState) =>
 export const selectIsOpenBankingAdmin = (state: RootState) =>
   state.profile.isOpenBankingAdmin;
 
-export const selectLastTagId = (state: RootState) => state.profile.lastTagId;
+export const selectIsAdmin = (state: RootState) => state.profile.isAdmin;
+
+export const selectRegistrationOpen = (state: RootState) =>
+  state.profile.registrationOpen;
+
+export const selectLastTagId =(state: RootState) => state.profile.lastTagId;
 
 export default profileSlice.reducer;

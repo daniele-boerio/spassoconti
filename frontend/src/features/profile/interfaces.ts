@@ -52,6 +52,11 @@ export interface RegisterParams extends LoginParams {
   email: string;
 }
 
+/** GET /auth/registration: pubblico, letto dalla schermata di accesso. */
+export interface RegistrationStatus {
+  enabled: boolean;
+}
+
 export interface ProfileState {
   /**
    * Il token salvato non è ancora stato verificato col server. Finché è vero
@@ -65,6 +70,13 @@ export interface ProfileState {
   email: string | null;
   isAuthenticated: boolean;
   isOpenBankingAdmin: boolean;
+  /** Admin dell'app: vede la sezione "Utenti" nelle impostazioni. */
+  isAdmin: boolean;
+  /**
+   * Iscrizioni aperte (REGISTRATION_ENABLED sul server). Parte da true: finché
+   * la risposta non arriva il link "Registrati" resta com'è sempre stato.
+   */
+  registrationOpen: boolean;
   // Tag da preselezionare nel form di nuova transazione: è l'ultimo usato,
   // ricordato sull'account (quindi valido su ogni dispositivo). null = nessuna
   // precompilazione, ed è lo stato in cui si torna salvando senza tag.
@@ -84,6 +96,7 @@ export interface ProfileResponse {
   username: string;
   email: string;
   is_open_banking_admin?: boolean;
+  is_admin?: boolean;
   // Tetto di spesa mensile (Decimal sul BE: arriva come stringa).
   monthly_spending_budget?: number | string | null;
   last_tag_id?: number | null;

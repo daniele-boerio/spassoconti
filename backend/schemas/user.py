@@ -82,6 +82,27 @@ class ResetPasswordRequest(BaseModel):
     )
 
 
+class RegistrationStatus(BaseModel):
+    """Se le iscrizioni sono aperte (REGISTRATION_ENABLED): il FE nasconde il
+    link "Registrati" quando non lo sono."""
+
+    enabled: bool
+
+
+class AdminUserOut(BaseModel):
+    """Un utente come lo vede l'admin nella lista delle impostazioni."""
+
+    id: int
+    username: str
+    email: str
+    # NULL = attivo; valorizzato = bannato da quel momento.
+    banned_at: Optional[datetime] = None
+    # L'admin stesso: il FE non mostra il pulsante di ban sulla sua riga.
+    is_admin: bool = False
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class UserUpdate(BaseModel):
     """Quello che l'utente può cambiare di sé dal profilo.
 
@@ -122,6 +143,9 @@ class UserResponse(BaseModel):
     monthly_spending_budget: Optional[Decimal] = None
     # True solo per l'utente admin dell'Open Banking (vedi OPEN_BANKING_ADMIN_EMAIL)
     is_open_banking_admin: bool = False
+    # True solo per l'admin dell'app (vedi auth.email_admin): vede la sezione
+    # "Utenti" nelle impostazioni.
+    is_admin: bool = False
     # Tag da preselezionare nel form di nuova transazione (vedi User.last_tag_id)
     last_tag_id: Optional[int] = None
 

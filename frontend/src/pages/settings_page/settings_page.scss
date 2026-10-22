@@ -157,6 +157,12 @@
     flex: 0 0 auto;
     font-size: 15px;
     font-weight: 700;
+
+    // Stato negativo (utente bannato nella sezione admin).
+    &--negative {
+      font-size: 13px;
+      color: v.$negative;
+    }
   }
 
   &--tappable:active {

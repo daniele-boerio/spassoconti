@@ -102,6 +102,20 @@ describe("errorMiddleware", () => {
     expect(payload.message).toContain("ab12cd34");
   });
 
+  it("traduce il messaggio dell'account bannato", () => {
+    const { dispatched } = run(
+      rejected("profile/login/rejected", {
+        status: 403,
+        detail: "This account has been disabled by the administrator",
+      }),
+    );
+
+    expect(shown(dispatched)).toEqual({
+      title: "Accesso negato (403)",
+      message: "Questo account è stato disattivato dall’amministratore.",
+    });
+  });
+
   it("traduce il 429 in un'istruzione, non nel messaggio del rate limiter", () => {
     const { dispatched } = run(
       rejected("profile/login/rejected", {

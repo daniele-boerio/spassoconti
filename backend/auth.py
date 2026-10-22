@@ -224,7 +224,11 @@ def apri_sessione(db: Session, user: User, request: Request, response: Response)
     Qui le credenziali sono già state validate: se fallisce, il problema è la
     creazione della sessione, e il messaggio deve dirlo invece di far sembrare
     il login stesso rotto (vedi `/auth/refresh`, stessa gestione).
+
+    È il punto da cui passano login, secondo passo della 2FA e passkey: il
+    controllo del ban sta qui, così nessuna strada lo salta.
     """
+    verifica_non_bannato(db, user)
     try:
         raw_refresh = issue_refresh_token(
             db, user.id, user_agent=request.headers.get("user-agent")
@@ -247,6 +251,23 @@ def apri_sessione(db: Session, user: User, request: Request, response: Response)
         data={"user_id": user.id, "token_version": user.token_version}
     )
     return {"access_token": access_token, "username": user.username}
+
+
+ACCOUNT_BLOCCATO = "This account has been disabled by the administrator"
+
+
+def verifica_non_bannato(db: Session, user: User) -> None:
+    """403 se l'admin ha bannato l'utente. Le credenziali sono già state
+    verificate: dire "bloccato" a chi ha la password giusta non rivela nulla.
+
+    Annulla quello che il chiamante ha già scritto (codice di recupero
+    bruciato, contatore della passkey): un accesso rifiutato non consuma nulla.
+    """
+    if user.banned_at is not None:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail=ACCOUNT_BLOCCATO
+        )
 
 
 def verifica_secondo_fattore(db: Session, user: User, codice: str) -> bool:
@@ -508,8 +529,14 @@ def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(secu
         db = SessionLocal()
         try:
             user = db.query(User).filter(User.id == user_id).first()
-            if not user or user.token_version != token_version:
-                logger.debug("token obsoleto o utente non trovato")
+            # Il ban alza già token_version; il controllo esplicito copre un
+            # ban scritto a mano in DB senza toccare la versione.
+            if (
+                not user
+                or user.token_version != token_version
+                or user.banned_at is not None
+            ):
+                logger.debug("token obsoleto, utente non trovato o bannato")
                 raise credentials_exception
         finally:
             db.close()
@@ -519,6 +546,49 @@ def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(secu
     except PyJWTError:
         logger.debug("Token JWT non valido", exc_info=True)
         raise credentials_exception
+
+
+def email_admin() -> str | None:
+    """Email dell'admin dell'app (vede gli utenti e può bannarli).
+
+    ADMIN_EMAIL; se manca vale OPEN_BANKING_ADMIN_EMAIL, che già identifica
+    l'unico utente "speciale" dell'app. Nessuna delle due = nessun admin.
+    """
+    email = os.getenv("ADMIN_EMAIL") or os.getenv("OPEN_BANKING_ADMIN_EMAIL")
+    email = (email or "").strip().lower()
+    return email or None
+
+
+def is_admin(user: User) -> bool:
+    admin = email_admin()
+    return bool(admin and user.email.lower() == admin)
+
+
+def get_app_admin_user_id(
+    db: Session = Depends(get_db_session),
+    current_user_id: int = Depends(get_current_user_id),
+) -> int:
+    """Cancello degli endpoint /admin: solo l'utente di `email_admin()`."""
+    user = db.query(User).filter(User.id == current_user_id).first()
+    if not user or not is_admin(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This area is restricted to the administrator",
+        )
+    return current_user_id
+
+
+def registrazione_aperta() -> bool:
+    """REGISTRATION_ENABLED=false chiude le iscrizioni (default: aperte).
+
+    Chi ha già un account continua a entrare: il flag ferma solo /register.
+    """
+    return os.getenv("REGISTRATION_ENABLED", "true").strip().lower() not in (
+        "false",
+        "0",
+        "no",
+        "off",
+    )
 
 
 def get_admin_user_id(

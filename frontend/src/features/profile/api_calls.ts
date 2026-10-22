@@ -9,6 +9,7 @@ import {
   ProfileResponse,
   RecoveryCodesResponse,
   RegisterParams,
+  RegistrationStatus,
   TwoFactorSetup,
   TwoFactorStatus,
   VerifyTwoFactorParams,
@@ -49,6 +50,26 @@ export const register = createAsyncThunk<AuthResponse, RegisterParams>(
       return response.data;
     } catch (error: any) {
       return rejectWithValue(error.response?.data || "Errore sconosciuto");
+    }
+  },
+);
+
+/**
+ * Se le iscrizioni sono aperte. Non fallisce mai: senza risposta resta il
+ * link "Registrati" e, se chiuse, ci pensa il 403 di /register. Il tipo non
+ * inizia con "profile/" di proposito: il matcher del pending disabiliterebbe
+ * il pulsante "Accedi" mentre la richiesta è in volo.
+ */
+export const getRegistrationStatus = createAsyncThunk<boolean, void>(
+  "auth/getRegistrationStatus",
+  async () => {
+    try {
+      const response = await api.get<RegistrationStatus>("/auth/registration", {
+        _skipAuthRefresh: true,
+      });
+      return response.data.enabled;
+    } catch {
+      return true;
     }
   },
 );

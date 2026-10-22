@@ -14,6 +14,7 @@ import bankProposalsReducer from "../features/bank_proposals/bank_proposals_slic
 import uiReducer from "../features/ui/ui_slice";
 import homeReducer from "../features/home/home_slice";
 import notificheReducer from "../features/notifiche/notifiche_slice";
+import adminReducer from "../features/admin/admin_slice";
 import { useDispatch, useSelector } from "react-redux";
 import { errorMiddleware } from "./error_middleware";
 
@@ -34,6 +35,7 @@ export const store = configureStore({
     ui: uiReducer,
     home: homeReducer,
     notifiche: notificheReducer,
+    admin: adminReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(errorMiddleware),

@@ -700,5 +700,18 @@
   "passkey_removed": "Passkey deleted",
   "passkey_remove": "Delete",
   "passkey_created": "Added on",
-  "passkey_last_used": "Last used on"
+  "passkey_last_used": "Last used on",
+
+  "admin_users_title": "Users",
+  "admin_you": "You",
+  "admin_banned": "Banned",
+  "admin_ban": "Ban user",
+  "admin_unban": "Reactivate user",
+  "admin_ban_hint": "They will no longer be able to sign in and will be signed out of every device. Their profile and transactions are kept: you can reactivate them at any time.",
+  "admin_banned_since": "Banned since",
+  "admin_unban_hint": "Once reactivated they can sign in again with their usual credentials.",
+  "admin_banned_toast": "User banned",
+  "admin_unbanned": "User reactivated",
+  "error_account_disabled": "This account has been disabled by the administrator.",
+  "error_registration_closed": "Registration is closed."
 }

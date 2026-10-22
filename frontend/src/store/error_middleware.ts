@@ -26,10 +26,20 @@ const titleKey = (status: number): string => {
   return "error";
 };
 
+// Messaggi del server che l'utente legge sulla schermata di accesso: arrivano
+// in inglese (come tutti i `detail`), qui li diamo nella sua lingua.
+const KNOWN_DETAILS: Record<string, string> = {
+  "This account has been disabled by the administrator": "error_account_disabled",
+  "Registration is currently closed": "error_registration_closed",
+};
+
 const buildMessage = (error: ApiError): string => {
   // Sui 429 il messaggio del server ("Rate limit exceeded: 10 per 1 minute") è
   // tecnico e non dice all'utente cosa fare.
   if (error.status === 429) return t("error_rate_limited");
+
+  const known = error.detail && KNOWN_DETAILS[error.detail];
+  if (known) return t(known);
 
   let message =
     error.detail || t(error.status >= 500 ? "error_server" : "error_generic");
