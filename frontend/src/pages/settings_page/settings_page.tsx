@@ -27,6 +27,7 @@ import {
 } from "../../features/profile/api_calls";
 import NotificationsSection from "./notifications_section";
 import AdminSection from "./admin_section";
+import TagSuggestionsSection from "./tag_suggestions_section";
 import PasskeySheet from "./passkey_sheet";
 import TwoFactorSheet from "./two_factor_sheet";
 import {
@@ -253,6 +254,8 @@ export default function SettingsPage() {
             </button>
           </div>
         </section>
+
+        <TagSuggestionsSection />
 
         <NotificationsSection />
 

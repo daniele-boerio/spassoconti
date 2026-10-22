@@ -164,6 +164,53 @@
         ]
       }
     },
+    "/api/me/preferenze": {
+      "put": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Update Preferenze",
+        "description": "Interruttori delle Impostazioni (oggi: i suggerimenti dei tag).",
+        "operationId": "update_preferenze_api_me_preferenze_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserPreferenze"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/monthlyBudget": {
       "put": {
         "tags": [
@@ -3186,6 +3233,181 @@
             }
           }
         }
+      }
+    },
+    "/api/tags/suggerimento": {
+      "get": {
+        "tags": [
+          "Tag"
+        ],
+        "summary": "Get Tag Suggerimento",
+        "description": "Il tag da proporre al salvataggio di una transazione, o null.\n\nImpara dalla storia dell'utente (services.suggerisci_tag). Null anche se\nl'utente ha spento i suggerimenti dalle Impostazioni.",
+        "operationId": "get_tag_suggerimento_api_tags_suggerimento_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "descrizione",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "title": "Descrizione"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/TagSuggerimentoOut"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Tag Suggerimento Api Tags Suggerimento Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tags/proposte": {
+      "get": {
+        "tags": [
+          "Tag"
+        ],
+        "summary": "Get Tag Proposte",
+        "description": "Pulizia in blocco: gruppi di transazioni senza tag con una frase in\ncomune (\"con paolo\") e il tag da usare (services.proposte_tag).",
+        "operationId": "get_tag_proposte_api_tags_proposte_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TagSuggerimentoOut"
+                  },
+                  "type": "array",
+                  "title": "Response Get Tag Proposte Api Tags Proposte Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/tags/applica": {
+      "post": {
+        "tags": [
+          "Tag"
+        ],
+        "summary": "Post Tag Applica",
+        "description": "Mette un tag (esistente o nuovo) sulle transazioni scelte nell'anteprima.\n\nTocca solo transazioni dell'utente ancora senza tag.",
+        "operationId": "post_tag_applica_api_tags_applica_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagApplica"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagApplicaOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/tags/proposte/rifiuta": {
+      "post": {
+        "tags": [
+          "Tag"
+        ],
+        "summary": "Post Tag Proposta Rifiuta",
+        "description": "\"Non chiederlo più\": la coppia frase/tag non verrà più proposta.",
+        "operationId": "post_tag_proposta_rifiuta_api_tags_proposte_rifiuta_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagRifiuta"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/tags/{tag_id}": {
@@ -9468,6 +9690,61 @@
         "type": "object",
         "title": "StoricoInvestimentoUpdate"
       },
+      "TagApplica": {
+        "properties": {
+          "tag_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag Id"
+          },
+          "nome": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nome"
+          },
+          "transazione_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Transazione Ids"
+          }
+        },
+        "type": "object",
+        "title": "TagApplica",
+        "description": "Mette un tag sulle transazioni scelte: esistente (`tag_id`) o per nome,\ncreato se non c'è."
+      },
+      "TagApplicaOut": {
+        "properties": {
+          "tag": {
+            "$ref": "#/components/schemas/TagOut"
+          },
+          "aggiornate": {
+            "type": "integer",
+            "title": "Aggiornate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tag",
+          "aggiornate"
+        ],
+        "title": "TagApplicaOut"
+      },
       "TagCreate": {
         "properties": {
           "nome": {
@@ -9515,6 +9792,84 @@
           "lastUpdate"
         ],
         "title": "TagOut"
+      },
+      "TagRifiuta": {
+        "properties": {
+          "chiave": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Chiave"
+          },
+          "nome": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Nome"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chiave",
+          "nome"
+        ],
+        "title": "TagRifiuta",
+        "description": "\"Non chiederlo più\" per questa coppia frase/tag."
+      },
+      "TagSuggerimentoOut": {
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "esistente",
+              "nuovo"
+            ],
+            "title": "Tipo"
+          },
+          "tag_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag Id"
+          },
+          "nome": {
+            "type": "string",
+            "title": "Nome"
+          },
+          "chiave": {
+            "type": "string",
+            "title": "Chiave"
+          },
+          "frase": {
+            "type": "string",
+            "title": "Frase"
+          },
+          "occorrenze": {
+            "type": "integer",
+            "title": "Occorrenze"
+          },
+          "transazioni": {
+            "items": {
+              "$ref": "#/components/schemas/TransazioneAnteprima"
+            },
+            "type": "array",
+            "title": "Transazioni",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "tipo",
+          "nome",
+          "chiave",
+          "frase",
+          "occorrenze"
+        ],
+        "title": "TagSuggerimentoOut",
+        "description": "Tag proposto per una descrizione o per un gruppo di transazioni\n(services.suggerisci_tag / services.proposte_tag)."
       },
       "TagUpdate": {
         "properties": {
@@ -9580,6 +9935,49 @@
         ],
         "title": "Token",
         "description": "Esito di login, registrazione e refresh.\n\nCon la 2FA attiva il login risponde senza `access_token`: `mfa_required` è\nvero e `mfa_token` va ripresentato a POST /auth/2fa/verify con il codice."
+      },
+      "TransazioneAnteprima": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "descrizione": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descrizione"
+          },
+          "importo": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Importo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "importo"
+        ],
+        "title": "TransazioneAnteprima",
+        "description": "Riga dell'anteprima: le transazioni passate che finirebbero nel tag."
       },
       "TransazioneCreate": {
         "properties": {
@@ -10255,6 +10653,24 @@
         ],
         "title": "UserCreate"
       },
+      "UserPreferenze": {
+        "properties": {
+          "suggerimenti_tag": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggerimenti Tag"
+          }
+        },
+        "type": "object",
+        "title": "UserPreferenze",
+        "description": "Interruttori delle Impostazioni. Aggiornamento parziale: i campi non\ninviati restano com'erano."
+      },
       "UserResponse": {
         "properties": {
           "username": {
@@ -10298,6 +10714,11 @@
             "type": "boolean",
             "title": "Is Admin",
             "default": false
+          },
+          "suggerimenti_tag": {
+            "type": "boolean",
+            "title": "Suggerimenti Tag",
+            "default": true
           },
           "last_tag_id": {
             "anyOf": [

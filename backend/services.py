@@ -6,6 +6,7 @@ import os
 import re
 import threading
 import time
+import unicodedata
 import requests
 import yfinance as yf
 from cryptography.fernet import Fernet, InvalidToken
@@ -2349,3 +2350,464 @@ def task_promemoria_ricorrenze():
                 logger.exception("Promemoria ricorrenze falliti per user_id=%s", user_id)
     finally:
         db.close()
+
+
+# --- SUGGERIMENTO DEL TAG DALLA DESCRIZIONE --------------------------------------
+#
+# Si impara dalla storia dell'utente, senza servizi esterni: le descrizioni
+# passate si spezzano in frasi brevi e si conta con che tag sono state salvate.
+#
+# Al salvataggio di una transazione (la descrizione è di solito l'ultima cosa
+# che si scrive) il FE chiede `suggerisci_tag`, che risponde in due modi:
+#
+# - "esistente": una frase della descrizione torna spesso e quasi sempre con lo
+#   stesso tag ("con gaia" 6 volte, 5 con #gaia), oppure la descrizione nomina
+#   un tag che esiste ("cena con Gaia" e c'è #gaia);
+# - "nuovo": una frase di contesto ("con paolo", "a lavoro": preposizione +
+#   parola) torna in più transazioni ancora senza tag: si propone di creare il
+#   tag "paolo", con l'anteprima delle transazioni passate da metterci.
+#
+# Dalle Impostazioni `proposte_tag` fa lo stesso lavoro su tutta la storia, per
+# raggruppare in blocco quello che è rimasto senza tag.
+#
+# Le frasi si confrontano normalizzate: minuscole, senza accenti, senza
+# articoli ("con la Gaia" = "con gaia"), preposizioni articolate ridotte
+# ("alla palestra" = "a palestra") e singolare/plurale insieme ("lavoro" =
+# "lavori"). Le transazioni recenti pesano di più: le abitudini cambiano.
+#
+# "Non chiederlo più" si ricorda (TagPropostaRifiutata); User.suggerimenti_tag
+# spento zittisce le domande al salvataggio.
+
+SUGGERIMENTO_MIN_OCCORRENZE = 3
+SUGGERIMENTO_MIN_QUOTA = 0.6
+# Tag nuovo al salvataggio: quante transazioni passate senza tag servono.
+SUGGERIMENTO_NUOVO_MIN = 2
+# Pulizia in blocco: un gruppo da proporre deve essere un po' più corposo.
+PROPOSTE_MIN = 3
+PROPOSTE_MAX = 20
+# Peso di una transazione: si dimezza ogni sei mesi.
+SUGGERIMENTO_MEZZA_VITA_GIORNI = 180
+SUGGERIMENTO_STORIA = 1500
+PROPOSTE_STORIA = 5000
+SUGGERIMENTO_MAX_PAROLE = 3
+ANTEPRIMA_MAX = 200
+
+# Da sole non dicono niente; dentro una frase ("a lavoro", "con gaia") sì.
+PAROLE_VUOTE = frozenset(
+    """a ad da di in su con per tra fra e ed o che mi ti si ci vi non piu poi
+    ma anche""".split()
+)
+ARTICOLI = frozenset("il lo la i gli le l un uno una".split())
+PREPOSIZIONI_ARTICOLATE = {
+    **dict.fromkeys("al allo alla ai agli alle all".split(), "a"),
+    **dict.fromkeys("dal dallo dalla dai dagli dalle dall".split(), "da"),
+    **dict.fromkeys("del dello della dei degli delle dell".split(), "di"),
+    **dict.fromkeys("nel nello nella nei negli nelle nell".split(), "in"),
+    **dict.fromkeys("sul sullo sulla sui sugli sulle sull".split(), "su"),
+    **dict.fromkeys("col coi".split(), "con"),
+}
+# Le preposizioni che introducono un contesto da tag: con chi, dove, per cosa.
+PREPOSIZIONI_CONTESTO = frozenset("a da con per in su tra fra".split())
+
+_PAROLA = re.compile(r"[^\W_]+", re.UNICODE)
+
+
+def _senza_accenti(parola: str) -> str:
+    return "".join(
+        c for c in unicodedata.normalize("NFKD", parola) if not unicodedata.combining(c)
+    )
+
+
+def _radice(parola: str) -> str:
+    """Singolare e plurale insieme: "lavoro"/"lavori" → "lavor"."""
+    if len(parola) >= 4 and parola[-1] in "aeiou":
+        return parola[:-1]
+    return parola
+
+
+def _gettoni(testo: str) -> tuple[list[str], list[int], list[str]]:
+    """Parole normalizzate, la posizione di ognuna fra le parole originali, e
+    le parole originali (per mostrare la frase come l'ha scritta l'utente)."""
+    originali = _PAROLA.findall(testo or "")
+    norm, posizioni = [], []
+    for i, parola in enumerate(originali):
+        base = _senza_accenti(parola.lower())
+        if base in ARTICOLI:
+            continue
+        base = PREPOSIZIONI_ARTICOLATE.get(base, base)
+        if base not in PAROLE_VUOTE:
+            base = _radice(base)
+        norm.append(base)
+        posizioni.append(i)
+    return norm, posizioni, originali
+
+
+def _frasi(parole: list[str]) -> dict[tuple[str, ...], int]:
+    """Le sequenze di 1..3 parole consecutive (→ indice d'inizio), escluse
+    quelle di sole parole vuote e le parole singole troppo corte."""
+    frasi: dict[tuple[str, ...], int] = {}
+    for n in range(1, SUGGERIMENTO_MAX_PAROLE + 1):
+        for i in range(len(parole) - n + 1):
+            frase = tuple(parole[i : i + n])
+            if all(parola in PAROLE_VUOTE for parola in frase):
+                continue
+            if n == 1 and len(frase[0]) < 3:
+                continue
+            frasi.setdefault(frase, i)
+    return frasi
+
+
+def _frasi_contesto(parole: list[str]) -> dict[tuple[str, str], int]:
+    """Le coppie "preposizione + parola" ("con paol", "a lavor") → indice."""
+    return {
+        (parole[i], parole[i + 1]): i
+        for i in range(len(parole) - 1)
+        if parole[i] in PREPOSIZIONI_CONTESTO
+        and parole[i + 1] not in PAROLE_VUOTE
+        and len(parole[i + 1]) >= 3
+        and not parole[i + 1].isdigit()
+    }
+
+
+def _testo_frase(gettoni, inizio: int, lunghezza: int) -> str:
+    """La frase com'è scritta nella descrizione, articoli compresi."""
+    _, posizioni, originali = gettoni
+    return " ".join(originali[posizioni[inizio] : posizioni[inizio + lunghezza - 1] + 1])
+
+
+def _peso(giorno: Optional[date], oggi: date) -> float:
+    if giorno is None:
+        return 0.5
+    giorni = max((oggi - giorno).days, 0)
+    return 0.5 ** (giorni / SUGGERIMENTO_MEZZA_VITA_GIORNI)
+
+
+def _query_storia_taggabile(db: Session, user_id: int) -> Query:
+    """Le transazioni dell'utente con una descrizione e che un tag lo prendono."""
+    return db.query(models.Transazione).filter(
+        models.Transazione.user_id == user_id,
+        models.Transazione.deleted_at.is_(None),
+        models.Transazione.descrizione.isnot(None),
+        models.Transazione.descrizione != "",
+        # I giroconti il tag non ce l'hanno: conterebbero come "senza tag".
+        models.Transazione.tipo != "RICARICA",
+    )
+
+
+def _storia(db: Session, user_id: int, limite: int) -> list[dict]:
+    oggi = date.today()
+    righe = (
+        _query_storia_taggabile(db, user_id)
+        .with_entities(
+            models.Transazione.id,
+            models.Transazione.data,
+            models.Transazione.descrizione,
+            models.Transazione.importo,
+            models.Transazione.tag_id,
+        )
+        .order_by(models.Transazione.data.desc(), models.Transazione.id.desc())
+        .limit(limite)
+        .all()
+    )
+    storia = []
+    for id_, giorno, descrizione, importo, tag_id in righe:
+        gettoni = _gettoni(descrizione)
+        storia.append(
+            {
+                "id": id_,
+                "data": giorno,
+                "descrizione": descrizione,
+                "importo": importo,
+                "tag_id": tag_id,
+                "peso": _peso(giorno, oggi),
+                "gettoni": gettoni,
+                "frasi": _frasi(gettoni[0]),
+                "contesto": _frasi_contesto(gettoni[0]),
+            }
+        )
+    return storia
+
+
+def _anteprima(righe: list[dict]) -> list[dict]:
+    return [
+        {
+            "id": r["id"],
+            "data": r["data"],
+            "descrizione": r["descrizione"],
+            "importo": r["importo"],
+        }
+        for r in righe[:ANTEPRIMA_MAX]
+    ]
+
+
+def _rifiutate(db: Session, user_id: int) -> set[tuple[str, str]]:
+    return {
+        (frase, nome.lower())
+        for frase, nome in db.query(
+            models.TagPropostaRifiutata.frase, models.TagPropostaRifiutata.nome
+        ).filter(models.TagPropostaRifiutata.user_id == user_id)
+    }
+
+
+def _chiave(frase: tuple[str, ...]) -> str:
+    return " ".join(frase)
+
+
+def _tag_dominante(righe: list[dict]) -> Optional[tuple[int, int, float]]:
+    """(tag_id, volte, quota pesata) del tag più usato fra le righe, se c'è."""
+    peso_totale = sum(r["peso"] for r in righe)
+    per_tag: dict[int, list[float]] = {}
+    for r in righe:
+        if r["tag_id"] is not None:
+            per_tag.setdefault(r["tag_id"], []).append(r["peso"])
+    if not per_tag or peso_totale == 0:
+        return None
+    tag_id, pesi = max(per_tag.items(), key=lambda kv: (sum(kv[1]), len(kv[1])))
+    return tag_id, len(pesi), sum(pesi) / peso_totale
+
+
+def _quota_senza_tag(righe: list[dict]) -> float:
+    peso_totale = sum(r["peso"] for r in righe)
+    if peso_totale == 0:
+        return 0.0
+    return sum(r["peso"] for r in righe if r["tag_id"] is None) / peso_totale
+
+
+def suggerisci_tag(db: Session, user_id: int, descrizione: str) -> Optional[dict]:
+    """Il tag da proporre al salvataggio di `descrizione`, o None.
+
+    Restituisce {tipo, tag_id, nome, chiave, frase, occorrenze, transazioni}:
+    `chiave` è la frase normalizzata (da rimandare per "Non chiederlo più"),
+    `frase` com'è scritta; per "nuovo" `transazioni` è l'anteprima delle
+    transazioni passate senza tag che finirebbero nel tag.
+    """
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user is None or not user.suggerimenti_tag:
+        return None
+
+    gettoni = _gettoni(descrizione)
+    candidate = _frasi(gettoni[0])
+    if not candidate:
+        return None
+
+    rifiutate = _rifiutate(db, user_id)
+    tag_utente = db.query(models.Tag).filter(models.Tag.user_id == user_id).all()
+    tag_per_id = {tag.id: tag for tag in tag_utente}
+    storia = _storia(db, user_id, SUGGERIMENTO_STORIA)
+
+    # 1. Tag esistente dalle statistiche.
+    per_frase: dict[tuple[str, ...], list[dict]] = {}
+    for riga in storia:
+        for frase in riga["frasi"].keys() & candidate.keys():
+            per_frase.setdefault(frase, []).append(riga)
+
+    migliore = None
+    for frase, righe in per_frase.items():
+        dominante = _tag_dominante(righe)
+        if dominante is None:
+            continue
+        tag_id, volte, quota = dominante
+        tag = tag_per_id.get(tag_id)
+        if tag is None or volte < SUGGERIMENTO_MIN_OCCORRENZE or quota < SUGGERIMENTO_MIN_QUOTA:
+            continue
+        if (_chiave(frase), tag.nome.lower()) in rifiutate:
+            continue
+        # A parità di sicurezza vince la frase vista più volte, poi la più
+        # lunga ("con gaia" batte "gaia": è più specifica).
+        punteggio = (round(quota, 2), volte, len(frase))
+        if migliore is None or punteggio > migliore[0]:
+            migliore = (punteggio, frase, tag, volte)
+
+    if migliore is not None:
+        _, frase, tag, volte = migliore
+        return {
+            "tipo": "esistente",
+            "tag_id": tag.id,
+            "nome": tag.nome,
+            "chiave": _chiave(frase),
+            "frase": _testo_frase(gettoni, candidate[frase], len(frase)),
+            "occorrenze": volte,
+            "transazioni": [],
+        }
+
+    # 2. La descrizione nomina un tag che esiste già ("cena con Gaia" → #gaia).
+    for tag in tag_utente:
+        nome = tuple(_gettoni(tag.nome)[0])
+        if not nome or (len(nome) == 1 and len(nome[0]) < 3):
+            continue
+        if nome in candidate and (_chiave(nome), tag.nome.lower()) not in rifiutate:
+            return {
+                "tipo": "esistente",
+                "tag_id": tag.id,
+                "nome": tag.nome,
+                "chiave": _chiave(nome),
+                "frase": _testo_frase(gettoni, candidate[nome], len(nome)),
+                "occorrenze": 0,
+                "transazioni": [],
+            }
+
+    # 3. Tag nuovo: "con paolo" torna in più transazioni ancora senza tag.
+    #    A parità vince quella più in fondo alla descrizione ("finisce con").
+    nomi_esistenti = {_chiave(tuple(_gettoni(tag.nome)[0])) for tag in tag_utente}
+    contesto = _frasi_contesto(gettoni[0])
+    proposta = None
+    for frase, inizio in contesto.items():
+        if frase[1] in nomi_esistenti:
+            continue
+        nome = gettoni[2][gettoni[1][inizio + 1]].lower()
+        if (_chiave(frase), nome) in rifiutate:
+            continue
+        righe = [r for r in storia if frase in r["contesto"]]
+        senza_tag = [r for r in righe if r["tag_id"] is None]
+        if len(senza_tag) < SUGGERIMENTO_NUOVO_MIN:
+            continue
+        if _quota_senza_tag(righe) < SUGGERIMENTO_MIN_QUOTA:
+            continue
+        punteggio = (len(senza_tag), inizio)
+        if proposta is None or punteggio > proposta[0]:
+            proposta = (punteggio, frase, inizio, nome, senza_tag)
+
+    if proposta is None:
+        return None
+    _, frase, inizio, nome, senza_tag = proposta
+    return {
+        "tipo": "nuovo",
+        "tag_id": None,
+        "nome": nome,
+        "chiave": _chiave(frase),
+        "frase": _testo_frase(gettoni, inizio, 2),
+        "occorrenze": len(senza_tag),
+        "transazioni": _anteprima(senza_tag),
+    }
+
+
+def proposte_tag(db: Session, user_id: int) -> list[dict]:
+    """Pulizia in blocco: gruppi di transazioni senza tag con la stessa frase
+    di contesto ("con paolo"), ognuno col tag da usare (esistente o nuovo).
+
+    Stesso formato di `suggerisci_tag`; i gruppi più numerosi prima.
+    """
+    rifiutate = _rifiutate(db, user_id)
+    tag_utente = db.query(models.Tag).filter(models.Tag.user_id == user_id).all()
+    tag_per_id = {tag.id: tag for tag in tag_utente}
+    tag_per_nome = {_chiave(tuple(_gettoni(tag.nome)[0])): tag for tag in tag_utente}
+    storia = _storia(db, user_id, PROPOSTE_STORIA)
+
+    per_frase: dict[tuple[str, str], list[dict]] = {}
+    for riga in storia:
+        for frase in riga["contesto"]:
+            per_frase.setdefault(frase, []).append(riga)
+
+    proposte = []
+    for frase, righe in per_frase.items():
+        senza_tag = [r for r in righe if r["tag_id"] is None]
+        if len(senza_tag) < PROPOSTE_MIN:
+            continue
+
+        # La frase com'è scritta nella transazione più recente del gruppo.
+        esempio = senza_tag[0]
+        inizio = esempio["contesto"][frase]
+        testo = _testo_frase(esempio["gettoni"], inizio, 2)
+        nome_scritto = esempio["gettoni"][2][esempio["gettoni"][1][inizio + 1]].lower()
+
+        dominante = _tag_dominante(righe)
+        tag = None
+        if dominante is not None:
+            tag_id, volte, quota_tag = dominante
+            con_tag = [r for r in righe if r["tag_id"] is not None]
+            quota_fra_taggate = (
+                sum(r["peso"] for r in con_tag if r["tag_id"] == tag_id)
+                / sum(r["peso"] for r in con_tag)
+            )
+            if volte >= 2 and quota_fra_taggate >= SUGGERIMENTO_MIN_QUOTA:
+                tag = tag_per_id.get(tag_id)
+        if tag is None:
+            tag = tag_per_nome.get(frase[1])
+        if tag is None and _quota_senza_tag(righe) < SUGGERIMENTO_MIN_QUOTA:
+            continue
+
+        nome = tag.nome if tag else nome_scritto
+        if (_chiave(frase), nome.lower()) in rifiutate:
+            continue
+        proposte.append(
+            {
+                "tipo": "esistente" if tag else "nuovo",
+                "tag_id": tag.id if tag else None,
+                "nome": nome,
+                "chiave": _chiave(frase),
+                "frase": testo,
+                "occorrenze": len(senza_tag),
+                "transazioni": _anteprima(senza_tag),
+            }
+        )
+
+    proposte.sort(key=lambda p: p["occorrenze"], reverse=True)
+    return proposte[:PROPOSTE_MAX]
+
+
+def applica_tag(
+    db: Session,
+    user_id: int,
+    transazione_ids: list[int],
+    tag_id: Optional[int] = None,
+    nome: Optional[str] = None,
+) -> tuple[models.Tag, int]:
+    """Mette un tag (esistente per id, oppure per nome: riusato se c'è,
+    altrimenti creato) sulle transazioni scelte dall'utente.
+
+    Solo transazioni sue, non cancellate, non giroconti e ancora senza tag: un
+    tag messo a mano non si sovrascrive. Non fa commit. Solleva ValueError se
+    il tag non è dell'utente o manca il nome.
+    """
+    if tag_id is not None:
+        tag = (
+            db.query(models.Tag)
+            .filter(models.Tag.id == tag_id, models.Tag.user_id == user_id)
+            .first()
+        )
+        if tag is None:
+            raise ValueError("Tag not found")
+    else:
+        nome = (nome or "").strip()
+        if not nome:
+            raise ValueError("Missing tag name")
+        tag = (
+            db.query(models.Tag)
+            .filter(models.Tag.user_id == user_id, func.lower(models.Tag.nome) == nome.lower())
+            .first()
+        )
+        if tag is None:
+            tag = models.Tag(nome=nome, user_id=user_id)
+            db.add(tag)
+            db.flush()
+
+    aggiornate = 0
+    if transazione_ids:
+        aggiornate = (
+            _query_storia_taggabile(db, user_id)
+            .filter(
+                models.Transazione.id.in_(transazione_ids),
+                models.Transazione.tag_id.is_(None),
+            )
+            .update({"tag_id": tag.id}, synchronize_session=False)
+        )
+    return tag, aggiornate
+
+
+def rifiuta_proposta_tag(db: Session, user_id: int, chiave: str, nome: str) -> None:
+    """"Non chiederlo più": ricorda la coppia frase/tag. Non fa commit."""
+    chiave = chiave.strip()[:100]
+    nome = nome.strip().lower()[:100]
+    if not chiave or not nome:
+        return
+    esiste = (
+        db.query(models.TagPropostaRifiutata)
+        .filter(
+            models.TagPropostaRifiutata.user_id == user_id,
+            models.TagPropostaRifiutata.frase == chiave,
+            models.TagPropostaRifiutata.nome == nome,
+        )
+        .first()
+    )
+    if esiste is None:
+        db.add(models.TagPropostaRifiutata(user_id=user_id, frase=chiave, nome=nome))

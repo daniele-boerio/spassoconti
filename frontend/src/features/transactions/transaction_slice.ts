@@ -20,6 +20,7 @@ import {
   TransactionsState,
 } from "./interfaces";
 import { RootState } from "../../store/store";
+import { applyTag } from "../tags/api_calls";
 import { PeriodPreset, periodRange } from "./period";
 import { DEFAULT_PERIOD } from "./filters_url";
 import {
@@ -316,6 +317,8 @@ const transactionsSlice = createSlice({
             deleteTransaction.fulfilled.type,
             splitTransaction.fulfilled.type,
             flushOfflineTransactions.fulfilled.type,
+            // Un tag messo in blocco su transazioni passate (suggerimenti).
+            applyTag.fulfilled.type,
           ].includes(action.type),
         (state) => {
           state.revision += 1;

@@ -21,8 +21,18 @@ import { showToast } from "../../../features/ui/ui_slice";
 import { selectContiConti } from "../../../features/conti/conto_slice";
 import { selectCategoriaCategorie } from "../../../features/categorie/categoria_slice";
 import { selectTagTags } from "../../../features/tags/tag_slice";
-import { selectLastTagId } from "../../../features/profile/profile_slice";
-import { createTag } from "../../../features/tags/api_calls";
+import {
+  selectLastTagId,
+  selectSuggerimentiTag,
+} from "../../../features/profile/profile_slice";
+import {
+  applyTag,
+  createTag,
+  rejectTagSuggestion,
+  suggestTag,
+} from "../../../features/tags/api_calls";
+import { TagSuggestion } from "../../../features/tags/interfaces";
+import TagSuggestionSheet from "../../tag_suggestion_sheet/tag_suggestion_sheet";
 import {
   createCategoria,
   createSottoCategorie,
@@ -68,6 +78,7 @@ export default function TransactionDialog({
   const categorie = useAppSelector(selectCategoriaCategorie);
   const tags = useAppSelector(selectTagTags);
   const lastTagId = useAppSelector(selectLastTagId);
+  const suggerimentiTag = useAppSelector(selectSuggerimentiTag);
 
   // Stati del form
   const [tipo, setTipo] = useState<tipoTransaction>("USCITA");
@@ -101,10 +112,22 @@ export default function TransactionDialog({
   // Transazione su cui agisce lo split: quella esistente (modifica) o quella
   // appena creata (creazione + dividi).
   const [splitTarget, setSplitTarget] = useState<Transaction | null>(null);
+  // Proposta di tag dalla descrizione, chiesta quando si preme Salva (la
+  // descrizione è di solito l'ultima cosa che si scrive). Vedi
+  // services.suggerisci_tag sul BE e TagSuggestionSheet.
+  const [pendingSuggestion, setPendingSuggestion] =
+    useState<TagSuggestion | null>(null);
+  const [applyingSuggestion, setApplyingSuggestion] = useState(false);
+  // Tag scelto a mano in questo form: la scelta dell'utente non si rimette in
+  // discussione, niente domanda.
+  const [tagTouched, setTagTouched] = useState(false);
 
   // Effetto per il popolamento (Edit) o reset (Create)
   useEffect(() => {
     if (visible) {
+      setPendingSuggestion(null);
+      // In modifica il tag c'è già (o è stato tolto apposta): niente proposte.
+      setTagTouched(!!transaction);
       if (transaction) {
         // Modalità UPDATE
         setTipo(transaction.tipo);
@@ -173,14 +196,23 @@ export default function TransactionDialog({
 
   // Costruisce il payload risolvendo (e creando se serve) tag/categoria/sottocategoria.
   // Estratto da handleSave per poterlo riusare anche nel flusso "crea e dividi".
-  const preparePayload = async () => {
+  //
+  // `tagOverride`: il tag accettato dalla proposta al salvataggio. Arriva già
+  // risolto (anche appena creato, quindi magari non ancora nella lista `tags`
+  // di questo render) e salta la risoluzione per nome.
+  const preparePayload = async (tagOverride?: string | null) => {
     const formattedDate = data ? toIsoDate(data) : "";
 
     const numericImporto = parseFloat(importo || "");
 
     // I selettori scrivono qui un id oppure — per una voce nuova — il nome
     // digitato: la creazione vera avviene solo ora, al salvataggio.
-    let finalTagId = tagId === "NEW_TAG" ? newTagName : tagId;
+    let finalTagId =
+      tagOverride !== undefined
+        ? tagOverride
+        : tagId === "NEW_TAG"
+          ? newTagName
+          : tagId;
     let finalCategoriaId =
       categoriaId === "NEW_CATEGORY" ? newCategoryName : categoriaId;
     let finalSottoCategoriaId =
@@ -189,7 +221,7 @@ export default function TransactionDialog({
         : sottoCategoriaId;
 
     // --- 1. CONTROLLO E CREAZIONE TAG ---
-    if (finalTagId) {
+    if (finalTagId && tagOverride === undefined) {
       // Cerchiamo se il valore corrisponde a un ID o a un nome esistente (case-insensitive)
       const tagExists = tags.find(
         (tag) =>
@@ -292,8 +324,35 @@ export default function TransactionDialog({
     if (saving) return;
     setSaving(true);
 
+    // La descrizione si scrive per ultima: la proposta del tag arriva qui, e
+    // solo in creazione, se il tag non l'ha scelto l'utente e i suggerimenti
+    // sono accesi. `suggestTag` non fallisce mai: senza rete si salva e basta.
+    if (
+      !transaction &&
+      !tagTouched &&
+      tipo !== "RICARICA" &&
+      suggerimentiTag &&
+      descrizione.trim().length >= 3
+    ) {
+      const suggestion = (await dispatch(suggestTag(descrizione.trim())))
+        .payload as TagSuggestion | null;
+      const alreadyChosen =
+        suggestion?.tipo === "esistente" &&
+        String(suggestion.tag_id) === String(tagId);
+      if (suggestion && !alreadyChosen) {
+        setSaving(false);
+        setPendingSuggestion(suggestion);
+        return;
+      }
+    }
+
+    await saveTransaction();
+  };
+
+  const saveTransaction = async (tagOverride?: string | null) => {
+    setSaving(true);
     try {
-      const payload = await preparePayload();
+      const payload = await preparePayload(tagOverride);
 
       if (transaction?.id) {
         await dispatch(
@@ -319,6 +378,60 @@ export default function TransactionDialog({
     } finally {
       setSaving(false);
     }
+  };
+
+  // --- Risposte alla proposta del tag ---
+
+  /** Sì: tag esistente → si salva con quello; nuovo → lo si crea (con le
+   *  transazioni passate spuntate) e si salva con il tag appena nato. */
+  const acceptSuggestion = async (selectedIds: string[]) => {
+    const suggestion = pendingSuggestion;
+    if (!suggestion) return;
+
+    let chosenTagId = suggestion.tag_id;
+    if (suggestion.tipo === "nuovo" || selectedIds.length > 0) {
+      setApplyingSuggestion(true);
+      try {
+        const result = await dispatch(
+          applyTag({
+            tag_id: suggestion.tag_id,
+            nome: suggestion.nome,
+            transazione_ids: selectedIds,
+          }),
+        ).unwrap();
+        chosenTagId = String(result.tag.id);
+      } catch {
+        // Mostrato dall'errorMiddleware: la domanda resta aperta.
+        return;
+      } finally {
+        setApplyingSuggestion(false);
+      }
+    }
+
+    setPendingSuggestion(null);
+    setTagId(chosenTagId);
+    setTagTouched(true);
+    await saveTransaction(chosenTagId);
+  };
+
+  /** No: solo per questa volta, si salva com'è. */
+  const declineSuggestion = async () => {
+    setPendingSuggestion(null);
+    await saveTransaction();
+  };
+
+  /** Non chiederlo più: la coppia frase/tag non torna, e si salva com'è. */
+  const neverSuggestion = async () => {
+    if (pendingSuggestion) {
+      dispatch(
+        rejectTagSuggestion({
+          chiave: pendingSuggestion.chiave,
+          nome: pendingSuggestion.nome,
+        }),
+      );
+    }
+    setPendingSuggestion(null);
+    await saveTransaction();
   };
 
   // Apre lo split. In modifica divide la transazione esistente; in creazione la
@@ -694,7 +807,22 @@ export default function TransactionDialog({
         value={tagId}
         clearLabel={t("tx_none")}
         createLabel={t("add_new_tag")}
-        onSelect={setTagId}
+        onSelect={(value) => {
+          setTagId(value);
+          setTagTouched(true);
+        }}
+      />
+
+      <TagSuggestionSheet
+        open={pendingSuggestion !== null}
+        suggestion={pendingSuggestion}
+        context="save"
+        busy={applyingSuggestion || saving}
+        onAccept={acceptSuggestion}
+        onDecline={declineSuggestion}
+        onNever={neverSuggestion}
+        // Chiuso senza rispondere: si torna al form, niente salvato.
+        onClose={() => setPendingSuggestion(null)}
       />
 
       <SplitTransactionDialog

@@ -103,6 +103,13 @@ class AdminUserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class UserPreferenze(BaseModel):
+    """Interruttori delle Impostazioni. Aggiornamento parziale: i campi non
+    inviati restano com'erano."""
+
+    suggerimenti_tag: Optional[bool] = None
+
+
 class UserUpdate(BaseModel):
     """Quello che l'utente può cambiare di sé dal profilo.
 
@@ -146,6 +153,8 @@ class UserResponse(BaseModel):
     # True solo per l'admin dell'app (vedi auth.email_admin): vede la sezione
     # "Utenti" nelle impostazioni.
     is_admin: bool = False
+    # Proposta del tag dalla descrizione al salvataggio (Impostazioni).
+    suggerimenti_tag: bool = True
     # Tag da preselezionare nel form di nuova transazione (vedi User.last_tag_id)
     last_tag_id: Optional[int] = None
 

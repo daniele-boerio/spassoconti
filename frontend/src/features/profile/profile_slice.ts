@@ -14,6 +14,7 @@ import {
   regenerateRecoveryCodes,
   register,
   restoreSession,
+  updatePreferences,
   updateUsername,
   verifyTwoFactor,
 } from "./api_calls";
@@ -39,6 +40,7 @@ const initialState: ProfileState = {
   isOpenBankingAdmin: false,
   isAdmin: false,
   registrationOpen: true,
+  suggerimentiTag: true,
   lastTagId: null,
   mfaToken: null,
   twoFactor: null,
@@ -176,6 +178,7 @@ const profileSlice = createSlice({
           state.isOpenBankingAdmin =
             action.payload.is_open_banking_admin ?? false;
           state.isAdmin = action.payload.is_admin ?? false;
+          state.suggerimentiTag = action.payload.suggerimenti_tag ?? true;
           // Il BE lo espone come intero: lo normalizziamo a stringa perché è
           // così che gli id della tassonomia viaggiano nel resto del FE.
           state.lastTagId =
@@ -245,6 +248,10 @@ const profileSlice = createSlice({
         localStorage.removeItem("username");
       })
 
+      .addCase(updatePreferences.fulfilled, (state, action) => {
+        state.suggerimentiTag = action.payload.suggerimenti_tag ?? true;
+      })
+
       .addCase(getRegistrationStatus.fulfilled, (state, action) => {
         state.registrationOpen = action.payload;
       })
@@ -290,6 +297,9 @@ export const selectIsOpenBankingAdmin = (state: RootState) =>
   state.profile.isOpenBankingAdmin;
 
 export const selectIsAdmin = (state: RootState) => state.profile.isAdmin;
+
+export const selectSuggerimentiTag = (state: RootState) =>
+  state.profile.suggerimentiTag;
 
 export const selectRegistrationOpen = (state: RootState) =>
   state.profile.registrationOpen;

@@ -17,6 +17,7 @@ from .user import (
     RecoveryCodesOut,
     RegistrationStatus,
     AdminUserOut,
+    UserPreferenze,
 )
 from .passkey import (
     PasskeyOut,
@@ -65,6 +66,11 @@ from .tag import (
     TagUpdate,
     TagOut,
     TagFilters,
+    TagSuggerimentoOut,
+    TransazioneAnteprima,
+    TagApplica,
+    TagApplicaOut,
+    TagRifiuta,
 )
 from .transazione import (
     TransazioneBase,

@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction, Action } from "@reduxjs/toolkit";
 import { Tag, TagState } from "./interfaces";
-import { createTag, deleteTag, getTags, updateTag } from "./api_calls";
+import { applyTag, createTag, deleteTag, getTags, updateTag } from "./api_calls";
 import { RootState } from "../../store/store";
 
 const initialState: TagState = {
@@ -49,7 +49,18 @@ const tagSlice = createSlice({
         }
       })
 
-      .addCase(deleteTag.fulfilled, (state, action: PayloadAction<string>) => {
+      // Un suggerimento accettato può aver creato il tag (o cambiato quante
+      // transazioni lo usano): lo si aggiunge o aggiorna nella lista.
+      .addCase(applyTag.fulfilled, (state, action) => {
+        const tag = action.payload.tag;
+        const index = state.tags.findIndex(
+          (current) => String(current.id) === String(tag.id),
+        );
+        if (index === -1) state.tags.push(tag);
+        else state.tags[index] = tag;
+      })
+
+      .addCase(deleteTag.fulfilled,(state, action: PayloadAction<string>) => {
         state.tags = state.tags.filter((tag) => tag.id !== action.payload);
       })
 

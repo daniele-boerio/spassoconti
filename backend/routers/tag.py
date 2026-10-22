@@ -1,13 +1,32 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import logging
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from database import get_db
 import auth
 from models import Tag, Transazione
 from sqlalchemy import func
-from schemas import TagCreate, TagOut, TagUpdate, TagFilters
-from services import apply_filters_and_sort
+from schemas import (
+    TagApplica,
+    TagApplicaOut,
+    TagCreate,
+    TagFilters,
+    TagOut,
+    TagRifiuta,
+    TagSuggerimentoOut,
+    TagUpdate,
+)
+from services import (
+    applica_tag,
+    apply_filters_and_sort,
+    proposte_tag,
+    rifiuta_proposta_tag,
+    suggerisci_tag,
+)
 
 router = APIRouter(prefix="/tags", tags=["Tag"])
+
+logger = logging.getLogger(__name__)
 
 # --- ENDPOINT TAG ---
 
@@ -79,6 +98,104 @@ def get_tags(
         )
         for tag in tags
     ]
+
+
+@router.get("/suggerimento", response_model=Optional[TagSuggerimentoOut])
+def get_tag_suggerimento(
+    descrizione: str = Query(..., max_length=200),
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    """Il tag da proporre al salvataggio di una transazione, o null.
+
+    Impara dalla storia dell'utente (services.suggerisci_tag). Null anche se
+    l'utente ha spento i suggerimenti dalle Impostazioni.
+    """
+    return suggerisci_tag(db, current_user_id, descrizione)
+
+
+@router.get("/proposte", response_model=list[TagSuggerimentoOut])
+def get_tag_proposte(
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    """Pulizia in blocco: gruppi di transazioni senza tag con una frase in
+    comune ("con paolo") e il tag da usare (services.proposte_tag)."""
+    return proposte_tag(db, current_user_id)
+
+
+@router.post("/applica", response_model=TagApplicaOut)
+def post_tag_applica(
+    payload: TagApplica,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    """Mette un tag (esistente o nuovo) sulle transazioni scelte nell'anteprima.
+
+    Tocca solo transazioni dell'utente ancora senza tag.
+    """
+    try:
+        tag, aggiornate = applica_tag(
+            db,
+            current_user_id,
+            payload.transazione_ids,
+            tag_id=payload.tag_id,
+            nome=payload.nome,
+        )
+    except ValueError as exc:
+        db.rollback()
+        status_code = (
+            status.HTTP_404_NOT_FOUND
+            if str(exc) == "Tag not found"
+            else status.HTTP_400_BAD_REQUEST
+        )
+        raise HTTPException(status_code=status_code, detail=str(exc))
+
+    try:
+        db.commit()
+        db.refresh(tag)
+    except Exception:
+        db.rollback()
+        logger.exception("Applicazione del tag fallita per user_id=%s", current_user_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while applying the tag",
+        )
+
+    n_transazioni = (
+        db.query(func.count(Transazione.id))
+        .filter(
+            Transazione.user_id == current_user_id,
+            Transazione.deleted_at.is_(None),
+            Transazione.tag_id == tag.id,
+        )
+        .scalar()
+    )
+    return {
+        "tag": TagOut.model_validate(tag).model_copy(
+            update={"n_transazioni": n_transazioni}
+        ),
+        "aggiornate": aggiornate,
+    }
+
+
+@router.post("/proposte/rifiuta", status_code=status.HTTP_204_NO_CONTENT)
+def post_tag_proposta_rifiuta(
+    payload: TagRifiuta,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    """"Non chiederlo più": la coppia frase/tag non verrà più proposta."""
+    try:
+        rifiuta_proposta_tag(db, current_user_id, payload.chiave, payload.nome)
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Rifiuto della proposta fallito per user_id=%s", current_user_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while saving the preference",
+        )
 
 
 @router.put("/{tag_id}", response_model=TagOut)

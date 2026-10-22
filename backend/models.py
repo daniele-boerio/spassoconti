@@ -64,11 +64,36 @@ class User(Base):
     notifica_budget = Column(Boolean, nullable=False, default=True)
     notifica_ricorrenze = Column(Boolean, nullable=False, default=True)
 
+    # Al salvataggio di una transazione propone un tag dalla descrizione
+    # (services.suggerisci_tag). Si spegne dalle Impostazioni.
+    suggerimenti_tag = Column(Boolean, nullable=False, default=True)
+
     # --- Ban dall'admin ---
     # Valorizzato = l'utente non entra più (login, 2FA, passkey, refresh). Il
     # profilo e i dati restano: togliere il ban (NULL) li rende di nuovo
     # accessibili. Vedi routers/admin.py.
     banned_at = Column(DateTime, nullable=True)
+
+
+class TagPropostaRifiutata(Base):
+    """Proposta di tag a cui l'utente ha risposto "No" al salvataggio.
+
+    Senza memoria la stessa domanda ("creo il tag paolo?") tornerebbe a ogni
+    spesa con quella frase: le statistiche su cui si basa non cambiano. Vedi
+    services.suggerisci_tag.
+    """
+
+    __tablename__ = "tag_proposte_rifiutate"
+    __table_args__ = (UniqueConstraint("user_id", "frase", "nome"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # La frase della descrizione ("con paolo") e il tag proposto ("paolo").
+    frase = Column(String(100), nullable=False)
+    nome = Column(String(100), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
 
 
 class RecoveryCode(Base):

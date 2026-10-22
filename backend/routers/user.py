@@ -12,6 +12,7 @@ from schemas import (
     Token,
     UserCreate,
     UserBudgetUpdate,
+    UserPreferenze,
     UserResponse,
     UserUpdate,
     CurrentMonthBudgetOut,
@@ -253,6 +254,36 @@ def update_me(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while updating the profile",
+        )
+
+    return get_me(db=db, current_user_id=current_user_id)
+
+
+@router.put("/me/preferenze", response_model=UserResponse)
+def update_preferenze(
+    payload: UserPreferenze,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(auth.get_current_user_id),
+):
+    """Interruttori delle Impostazioni (oggi: i suggerimenti dei tag)."""
+    user = db.query(User).filter(User.id == current_user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found. Your session may have expired",
+        )
+
+    try:
+        for field, value in payload.model_dump(exclude_unset=True).items():
+            if value is not None:
+                setattr(user, field, value)
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Aggiornamento preferenze fallito per user_id=%s", current_user_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while updating the preferences",
         )
 
     return get_me(db=db, current_user_id=current_user_id)

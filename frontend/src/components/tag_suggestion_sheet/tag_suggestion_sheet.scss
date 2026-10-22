@@ -1,0 +1,94 @@
+@use "../../styles/variables" as v;
+
+.tag-suggest {
+  &__intro {
+    margin: 0 0 14px;
+    font-size: 14px;
+    line-height: 1.45;
+    color: v.$muted;
+  }
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  &__eyebrow {
+    @include v.eyebrow;
+  }
+
+  &__toggle-all,
+  &__never {
+    border: 0;
+    background: transparent;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: v.$accent;
+    cursor: pointer;
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: v.$tap-target;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: v.$r-inner;
+    background: v.$surface-2;
+    color: v.$ink;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &[aria-checked="false"] {
+      opacity: 0.55;
+    }
+  }
+
+  &__check {
+    flex: 0 0 auto;
+    font-size: 20px;
+    color: v.$accent;
+  }
+
+  &__text {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__desc {
+    overflow: hidden;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  &__date {
+    font-size: 12px;
+    color: v.$muted;
+  }
+
+  &__never {
+    display: block;
+    margin: 14px auto 0;
+    color: v.$muted;
+  }
+}

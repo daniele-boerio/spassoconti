@@ -6,6 +6,7 @@ import {
   DisableTwoFactorParams,
   LoginParams,
   Passkey,
+  PreferencesParams,
   ProfileResponse,
   RecoveryCodesResponse,
   RegisterParams,
@@ -148,6 +149,20 @@ export const updateUsername = createAsyncThunk<ProfileResponse, string>(
     }
   },
 );
+
+/** Interruttori delle Impostazioni (oggi: i suggerimenti dei tag). */
+export const updatePreferences = createAsyncThunk<
+  ProfileResponse,
+  PreferencesParams
+>("profile/updatePreferences", async (params, { rejectWithValue }) => {
+  try {
+    const response = await api.put<ProfileResponse>("/me/preferenze", params);
+    return response.data;
+  } catch (error) {
+    const err = error as AxiosError;
+    return rejectWithValue(err.response?.data || "Errore salvataggio preferenze");
+  }
+});
 
 /**
  * Chiede la mail per reimpostare la password: è lo stesso flusso della
