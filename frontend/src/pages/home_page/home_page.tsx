@@ -147,6 +147,13 @@ export default function HomePage() {
     [categorie],
   );
 
+  // Le spese per categoria arrivano col nome, non con l'id: serve a aprire il
+  // dettaglio della categoria dalla card "Dove vanno i soldi".
+  const categoriaIdByName = useMemo(
+    () => new Map(categorie.map((c) => [c.nome, String(c.id)])),
+    [categorie],
+  );
+
   const contoById = useMemo(
     () => new Map(conti.map((c) => [String(c.id), c.nome])),
     [conti],
@@ -259,9 +266,23 @@ export default function HomePage() {
                       average > 0 && category.value > average * ABOVE_AVERAGE_RATIO;
                     const largest = topCategories[0].value;
                     const share = largest > 0 ? category.value / largest : 0;
+                    const categoriaId = categoriaIdByName.get(category.label);
+
+                    // Senza la categoria in store (non ancora caricata) la riga
+                    // resta ferma: non c'è un dettaglio da aprire.
+                    const Row = categoriaId ? "button" : "div";
 
                     return (
-                      <div className="category-list__row" key={category.label}>
+                      <Row
+                        className={`category-list__row${
+                          categoriaId ? " category-list__row--tappable" : ""
+                        }`}
+                        key={category.label}
+                        {...(categoriaId && {
+                          type: "button" as const,
+                          onClick: () => navigate(`/categories/${categoriaId}`),
+                        })}
+                      >
                         <span
                           className={`category-list__icon${
                             aboveAverage ? " category-list__icon--over" : ""
@@ -296,7 +317,7 @@ export default function HomePage() {
                             ]}
                           />
                         </div>
-                      </div>
+                      </Row>
                     );
                   })}
                 </div>

@@ -199,8 +199,11 @@ export const getTransactionsByCategory = createAsyncThunk<
       if (data_fine) params.append("data_fine", data_fine);
       if (tipo) params.append("tipo", tipo);
 
+      // Niente slash prima di `?`: la rotta è `/transazioni`, e su `/transazioni/`
+      // FastAPI risponde con un redirect in http che il browser (in https)
+      // blocca — a schermo diventava "Server non raggiungibile".
       const response = await api.get<Transaction[]>(
-        `/transazioni/?${params.toString()}`,
+        `/transazioni?${params.toString()}`,
       );
       return response.data;
     } catch (error) {
