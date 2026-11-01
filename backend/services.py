@@ -1,3 +1,4 @@
+import calendar
 import base64
 import functools
 import io
@@ -242,15 +243,32 @@ def task_aggiornamento_prezzi():
         db.close()
 
 
-def _prossima_occorrenza(data: date, frequenza: str) -> date:
+def _al_giorno(data: date, giorno: Optional[int]) -> date:
+    """`data` spostata al giorno `giorno` del suo mese, o all'ultimo se è corto."""
+    if not giorno:
+        return data
+    ultimo = calendar.monthrange(data.year, data.month)[1]
+    return data.replace(day=min(giorno, ultimo))
+
+
+def _prossima_occorrenza(
+    data: date, frequenza: str, giorno: Optional[int] = None
+) -> date:
+    """
+    L'occorrenza dopo `data`.
+
+    Per mensili e annuali `giorno` è il giorno scelto all'inizio: la data si
+    rimette lì ogni volta, così una rata sul 31 va al 30 a settembre e torna al
+    31 a ottobre invece di restare al 30.
+    """
     if frequenza == "GIORNALIERA":
         return data + timedelta(days=1)
     if frequenza == "SETTIMANALE":
         return data + timedelta(weeks=1)
     if frequenza == "MENSILE":
-        return data + relativedelta(months=1)
+        return _al_giorno(data + relativedelta(months=1), giorno)
     if frequenza == "ANNUALE":
-        return data + relativedelta(years=1)
+        return _al_giorno(data + relativedelta(years=1), giorno)
     raise ValueError(f"frequenza sconosciuta: {frequenza}")
 
 
@@ -347,7 +365,7 @@ def esegui_ricorrenza(
     # La prossima occorrenza si conta dalla data prevista, non da oggi:
     # registrare in ritardo non deve spostare in avanti tutte le successive.
     ric.prossima_esecuzione = _prossima_occorrenza(
-        ric.prossima_esecuzione, ric.frequenza
+        ric.prossima_esecuzione, ric.frequenza, ric.giorno_riferimento
     )
 
     if ric.rate_rimanenti is not None:
@@ -729,7 +747,9 @@ def stima_fine_debito(db: Session, debito: models.Debito) -> Optional[str]:
         )
         ultima = rata.prossima_esecuzione
         for _ in range(occorrenze - 1):
-            ultima = _prossima_occorrenza(ultima, rata.frequenza)
+            ultima = _prossima_occorrenza(
+                ultima, rata.frequenza, rata.giorno_riferimento
+            )
         return f"{ultima.year}-{ultima.month:02d}"
 
     pagamenti = (
