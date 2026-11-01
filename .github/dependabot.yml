@@ -6,6 +6,12 @@ version: 2
 updates:
   - package-ecosystem: pip
     directory: /backend
+    ignore:
+      # I salti di versione major si fanno a mano, quando c'è tempo di provarli:
+      # le PR automatiche restavano aperte per settimane. Gli aggiornamenti di
+      # sicurezza arrivano comunque (sono un'altra cosa rispetto a questi).
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     schedule:
       interval: weekly
       day: monday
@@ -17,6 +23,12 @@ updates:
 
   - package-ecosystem: npm
     directory: /frontend
+    ignore:
+      # I salti di versione major si fanno a mano, quando c'è tempo di provarli:
+      # le PR automatiche restavano aperte per settimane. Gli aggiornamenti di
+      # sicurezza arrivano comunque (sono un'altra cosa rispetto a questi).
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     schedule:
       interval: weekly
       day: monday
