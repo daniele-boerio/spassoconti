@@ -89,6 +89,8 @@ def create_ricorrenza(
 
     try:
         new_ric = Ricorrenza(**ricorrenza.model_dump(), user_id=current_user_id)
+        # Il giorno scelto adesso è quello a cui le rate tornano dopo un mese corto.
+        new_ric.giorno_riferimento = new_ric.prossima_esecuzione.day
         db.add(new_ric)
         db.commit()
         db.refresh(new_ric)
@@ -162,6 +164,10 @@ def update_ricorrenza(
     try:
         for key, value in update_dict.items():
             setattr(db_ric, key, value)
+
+        # Una data scelta a mano è il nuovo giorno di riferimento.
+        if update_dict.get("prossima_esecuzione") is not None:
+            db_ric.giorno_riferimento = db_ric.prossima_esecuzione.day
 
         db.commit()
         db.refresh(db_ric)

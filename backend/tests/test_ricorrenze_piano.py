@@ -260,3 +260,18 @@ def test_non_si_aggancia_il_debito_o_la_categoria_di_un_altro(api):
             headers=mario,
         )
         assert r.status_code == 400, (campo, r.text)
+
+
+def test_prossima_occorrenza_torna_al_giorno_scelto_dopo_un_mese_corto():
+    # Rata sul 31: a settembre scende al 30, a ottobre torna al 31.
+    from services import _prossima_occorrenza
+
+    settembre = _prossima_occorrenza(date(2026, 8, 31), "MENSILE", 31)
+    ottobre = _prossima_occorrenza(settembre, "MENSILE", 31)
+    febbraio = _prossima_occorrenza(date(2027, 1, 31), "MENSILE", 31)
+
+    assert settembre == date(2026, 9, 30)
+    assert ottobre == date(2026, 10, 31)
+    assert febbraio == date(2027, 2, 28)
+    # Annuale sul 29 febbraio: 28 negli anni normali, di nuovo 29 nei bisestili.
+    assert _prossima_occorrenza(date(2027, 2, 28), "ANNUALE", 29) == date(2028, 2, 29)

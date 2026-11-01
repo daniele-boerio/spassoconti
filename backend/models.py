@@ -613,6 +613,11 @@ class Ricorrenza(Base):
         String, nullable=False
     )  # GIORNALIERA, SETTIMANALE, MENSILE, ANNUALE
     prossima_esecuzione = Column(Date, nullable=False)  # La data in cui dovrà scattare
+    # Il giorno del mese scelto dall'utente (1-31). Serve alle ricorrenze mensili
+    # e annuali: dopo un mese corto la data scende (31/08 → 30/09), e senza
+    # ricordarsi il giorno di partenza resterebbe al 30 per sempre. NULL = si
+    # usa il giorno di `prossima_esecuzione` (le righe di prima della colonna).
+    giorno_riferimento = Column(Integer, nullable=True)
     attiva = Column(Boolean, default=True)
 
     # Chiavi esterne (template per la transazione futura)
