@@ -137,6 +137,11 @@ export default function MonthStatistics({
     [data, categoriaSelezionata],
   );
 
+  const incomeBars = useMemo(
+    () => expenseRows(data, categoriaSelezionata, "entrate"),
+    [data, categoriaSelezionata],
+  );
+
   // Le categorie con un tetto di spesa, e quanto ci si è speso nel mese.
   //
   // Il tetto è mensile e va confrontato con la spesa del mese *intera* su
@@ -343,6 +348,30 @@ export default function MonthStatistics({
           onSelect={openRow}
         />
       </Card>
+
+      {/* Stessa card, stesse righe cliccabili, per l'altro lato del mese.
+          Senza entrate (o con un filtro su una categoria di sole uscite)
+          non c'è niente da dire e la card non compare. */}
+      {incomeBars.length > 0 && (
+        <Card>
+          <CardTitle aside={t("analysis_tap_for_transactions")}>
+            {categoriaSelezionata
+              ? `${t("analysis_income_by_category")} - ${categoriaSelezionata.nome}`
+              : t("analysis_income_by_category")}
+          </CardTitle>
+
+          <CategoryBars
+            rows={incomeBars}
+            missingLabel={t(
+              categoriaSelezionata
+                ? "taxonomy_no_subcategory"
+                : "taxonomy_uncategorized",
+            )}
+            emptyText={t("no_data")}
+            onSelect={openRow}
+          />
+        </Card>
+      )}
 
       </PageColumn>
 

@@ -238,6 +238,7 @@
   "analysis_month_savings": "Risparmio del mese",
   "analysis_left": "Rimasto",
   "analysis_expenses_by_category": "Uscite per categoria",
+  "analysis_income_by_category": "Entrate per categoria",
   "analysis_tap_for_transactions": "tocca per i movimenti",
   "analysis_notable": "Da notare",
   "analysis_budget": "Budget per categoria",
@@ -698,7 +699,8 @@
   "passkey_removed": "Passkey eliminata",
   "passkey_remove": "Elimina",
   "passkey_created": "Aggiunta il",
-  "passkey_last_used": "Usata l’ultima volta il",
+  "passkey_last_used": "Usata l’ultima volta il"
+,
 
   "admin_users_title": "Utenti",
   "admin_you": "Tu",

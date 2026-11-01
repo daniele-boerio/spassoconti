@@ -29,4 +29,4 @@ EXPOSE 8000
 # Comando di avvio:
 # 1. Esegue le migrazioni di Alembic per aggiornare il database
 # 2. Avvia Uvicorn configurato per gestire proxy e documentazione corretta
-CMD ["sh", "-c", "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips=* --root-path /"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips=*"]

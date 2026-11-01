@@ -238,6 +238,7 @@
   "analysis_month_savings": "Savings this month",
   "analysis_left": "Left",
   "analysis_expenses_by_category": "Expenses by category",
+  "analysis_income_by_category": "Income by category",
   "analysis_tap_for_transactions": "tap for transactions",
   "analysis_notable": "Worth noting",
   "analysis_budget": "Budget by category",
@@ -700,7 +701,8 @@
   "passkey_removed": "Passkey deleted",
   "passkey_remove": "Delete",
   "passkey_created": "Added on",
-  "passkey_last_used": "Last used on",
+  "passkey_last_used": "Last used on"
+,
 
   "admin_users_title": "Users",
   "admin_you": "You",
