@@ -5,7 +5,20 @@ import { MonthlyDetailCategory, YearDetailsStatRow } from "./interfaces";
 // sottocategoria) non ce l'ha.
 export const UNCATEGORIZED = "Uncategorized";
 
-/** Una barra di "Uscite per categoria": una categoria, o una sottocategoria. */
+/**
+ * Quale lato del periodo si mette in classifica. I totali per categoria
+ * arrivano già netti e col segno (negativo uscita, positivo entrata): il lato
+ * decide quali righe tenere, il valore si scrive sempre in positivo.
+ */
+export type Direction = "uscite" | "entrate";
+
+const delLato = (totale: number, direction: Direction) =>
+  direction === "entrate" ? totale > 0 : totale < 0;
+
+/**
+ * Una barra di "Uscite per categoria" (o "Entrate per categoria"): una
+ * categoria, o una sottocategoria.
+ */
 export type ExpenseRow = {
   nome: string;
   totale: number;
@@ -27,11 +40,13 @@ export type ExpenseRow = {
  * c'è niente da mostrare: meglio vuoto che le righe di qualcun altro.
  *
  * `monthDetails` manda le uscite col segno meno: qui si ragiona in valore
- * assoluto, il segno lo rimette la scrittura.
+ * assoluto, il segno lo rimette la scrittura. Con `direction` "entrate" si
+ * tengono le righe col segno più, con le stesse regole.
  */
 export function expenseRows(
   data: MonthlyDetailCategory[],
   categoria: Categoria | null,
+  direction: Direction = "uscite",
 ): ExpenseRow[] {
   const rows: ExpenseRow[] = categoria
     ? (
@@ -55,7 +70,7 @@ export function expenseRows(
       }));
 
   return rows
-    .filter((row) => row.totale < 0)
+    .filter((row) => delLato(row.totale, direction))
     .map((row) => ({ ...row, totale: Math.abs(row.totale) }))
     .sort((a, b) => b.totale - a.totale);
 }
@@ -74,6 +89,7 @@ export function expenseRows(
 export function yearExpenseRows(
   rows: YearDetailsStatRow[],
   categoria: Categoria | null,
+  direction: Direction = "uscite",
 ): ExpenseRow[] {
   const totali = new Map<string, number>();
 
@@ -92,7 +108,10 @@ export function yearExpenseRows(
     : null;
 
   return [...totali]
-    .filter(([etichetta, totale]) => totale < 0 && (sue?.has(etichetta) ?? true))
+    .filter(
+      ([etichetta, totale]) =>
+        delLato(totale, direction) && (sue?.has(etichetta) ?? true),
+    )
     .map(([etichetta, totale]) => ({
       nome: etichetta,
       // Ai centesimi: nel mese i totali arrivano già sommati dal BE, qui li

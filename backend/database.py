@@ -17,7 +17,9 @@ database = os.getenv("DB_NAME")
 # Componi l'URL in modo dinamico. DATABASE_URL, se c'è, vince: serve agli E2E
 # (scripts/e2e_server.py, SQLite usa e getta). In produzione non è impostata.
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL") or (
-    f"postgresql://{user}:{password}@{host}:{port}/{database}"
+    # Driver esplicito: da SQLAlchemy 2.1 `postgresql://` sceglie psycopg 3, che
+    # non è installato (usiamo psycopg2-binary).
+    f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{database}"
 )
 
 # pool_pre_ping: dopo un riavvio di Postgres le connessioni nel pool sono morte, e

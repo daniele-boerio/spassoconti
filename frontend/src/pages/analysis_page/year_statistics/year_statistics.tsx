@@ -134,6 +134,11 @@ export default function YearStatistics({
     [rows, categoriaSelezionata],
   );
 
+  const incomeBars = useMemo(
+    () => yearExpenseRows(rows, categoriaSelezionata, "entrate"),
+    [rows, categoriaSelezionata],
+  );
+
   /**
    * I movimenti di una riga, su tutto l'anno che si sta guardando.
    *
@@ -293,6 +298,27 @@ export default function YearStatistics({
           onSelect={openRow}
         />
       </Card>
+
+      {incomeBars.length > 0 && (
+        <Card>
+          <CardTitle aside={t("analysis_tap_for_transactions")}>
+            {categoriaSelezionata
+              ? `${t("analysis_income_by_category")} - ${categoriaSelezionata.nome}`
+              : t("analysis_income_by_category")}
+          </CardTitle>
+
+          <CategoryBars
+            rows={incomeBars}
+            missingLabel={t(
+              categoriaSelezionata
+                ? "taxonomy_no_subcategory"
+                : "taxonomy_uncategorized",
+            )}
+            emptyText={t("no_data")}
+            onSelect={openRow}
+          />
+        </Card>
+      )}
 
       </PageColumn>
 

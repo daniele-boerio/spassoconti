@@ -146,11 +146,13 @@ def test_pulizia_toglie_solo_i_refresh_token_scaduti_da_tempo(api):
     services.task_pulizia_refresh_token()
 
     db = api.session_factory()
-    rimasti = {t.token_hash[0] for t in db.query(models.RefreshToken).all()}
+    rimasti = {t.token_hash for t in db.query(models.RefreshToken).all()}
     db.close()
     # Il vecchio sparisce; quello scaduto da poco e quello valido restano
-    # (più quello emesso dalla registrazione)
-    assert "a" not in rimasti and {"b", "c"} <= rimasti
+    # (più quello emesso dalla registrazione). Hash interi e non la prima
+    # lettera: quello della registrazione è casuale, e una volta su sedici
+    # comincia anche lui per "a".
+    assert "a" * 64 not in rimasti and {"b" * 64, "c" * 64} <= rimasti
     assert _riga(api, "pulizia_refresh_token").esito == "ok"
 
 

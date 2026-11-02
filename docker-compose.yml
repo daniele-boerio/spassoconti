@@ -15,6 +15,14 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+    # Limiti di risorse: per un'app docker-compose Coolify ignora quelli della
+    # sua UI, vanno qui. Servono a non far trascinare giù gli altri progetti
+    # sullo stesso server se un container impazzisce; sono larghi apposta.
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
 
   # ── Backend (FastAPI) ──
   # Nessun dominio pubblico: ci parla solo nginx, via rete Docker interna.
@@ -86,3 +94,10 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+    # Import di estratti conto e job notturni sono i picchi: 768M lasciano
+    # margine. Se il BE viene ucciso per memoria (OOM) nei log, alzare qui.
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768M
