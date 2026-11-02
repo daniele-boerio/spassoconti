@@ -148,3 +148,56 @@ describe("yearExpenseRows", () => {
     ).toEqual([]);
   });
 });
+
+describe("expenseRows con le entrate", () => {
+  it("tiene solo le categorie col segno più, dalla più grande", () => {
+    const rows = expenseRows(
+      [...mesePieno, cat("Rimborsi", 80)],
+      null,
+      "entrate",
+    );
+
+    expect(rows.map((row) => [row.nome, row.totale])).toEqual([
+      ["Stipendio", 1200],
+      ["Rimborsi", 80],
+    ]);
+  });
+
+  it("con una categoria scelta elenca le sue sottocategorie di entrata", () => {
+    const data = [
+      cat("Lavoro", 1500, [
+        { sottocategoria: "Stipendio", totale: 1300 },
+        { sottocategoria: "Bonus", totale: 200 },
+      ]),
+    ];
+
+    const rows = expenseRows(
+      data,
+      categoria("Lavoro", ["Stipendio", "Bonus"]),
+      "entrate",
+    );
+
+    expect(rows).toEqual([
+      { nome: "Stipendio", totale: 1300, sottocategoriaId: "100" },
+      { nome: "Bonus", totale: 200, sottocategoriaId: "101" },
+    ]);
+  });
+});
+
+describe("yearExpenseRows con le entrate", () => {
+  it("somma i mesi e tiene solo le etichette col segno più", () => {
+    const rows = yearExpenseRows(
+      [
+        { month: 1, Stipendio: 1200, Casa: -400 },
+        { month: 2, Stipendio: 1200.1, Casa: -404.42, Regali: 50 },
+      ] as YearDetailsStatRow[],
+      null,
+      "entrate",
+    );
+
+    expect(rows.map((row) => [row.nome, row.totale])).toEqual([
+      ["Stipendio", 2400.1],
+      ["Regali", 50],
+    ]);
+  });
+});
