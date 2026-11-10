@@ -22,8 +22,14 @@ import {
   ConfirmBankSessionParams,
   BankSessionResult,
   DisconnectBankParams,
+  Doppione,
+  Quadratura,
+  QuadraturaCreate,
+  MovimentiSimiliParams,
 } from "./interfaces";
 import { RootState } from "../../store/store";
+import { Transaction } from "../transactions/interfaces";
+import { mapTransaction } from "../transactions/transaction_slice";
 
 /**
  * Il totale del mese, con o senza le ricorrenti future.
@@ -334,6 +340,101 @@ export const correggiSaldo = createAsyncThunk<Conto, { id: string }>(
       return rejectWithValue(
         err.response?.data || "Errore correzione del saldo",
       );
+    }
+  },
+);
+
+/** Possibili doppioni: gli stessi del controllo notturno. */
+export const getDoppioni = createAsyncThunk<Doppione[], void>(
+  "conti/getDoppioni",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.get<Doppione[]>("/controlli/doppioni");
+      return response.data;
+    } catch (error) {
+      const err = error as AxiosError;
+      return rejectWithValue(err.response?.data || "Errore ricerca doppioni");
+    }
+  },
+);
+
+/** "Non è un doppione": il gruppo esce dal controllo per sempre. */
+export const ignoraDoppioni = createAsyncThunk<string[], { ids: string[] }>(
+  "conti/ignoraDoppioni",
+  async ({ ids }, { rejectWithValue }) => {
+    try {
+      await api.post("/controlli/doppioni/ignora", { ids: ids.map(Number) });
+      return ids;
+    } catch (error) {
+      const err = error as AxiosError;
+      return rejectWithValue(err.response?.data || "Errore doppioni");
+    }
+  },
+);
+
+/**
+ * Movimenti già salvati con lo stesso giorno, tipo e importo: l'avviso prima di
+ * salvarne uno uguale. Non passa dallo store, serve solo alla domanda.
+ */
+export const getMovimentiSimili = createAsyncThunk<
+  Transaction[],
+  MovimentiSimiliParams
+>("conti/getMovimentiSimili", async (params) => {
+  // Non fallisce mai, come `suggestTag`: senza risposta si salva e basta,
+  // l'avviso è un aiuto e non deve fermare il salvataggio.
+  try {
+    const query = new URLSearchParams({
+      data: params.data,
+      tipo: params.tipo,
+      importo: String(params.importo),
+    });
+    if (params.conto_id) query.append("conto_id", String(params.conto_id));
+    const response = await api.get<Transaction[]>(`/controlli/simili?${query}`);
+    return response.data.map(mapTransaction);
+  } catch {
+    return [];
+  }
+});
+
+export const getQuadrature = createAsyncThunk<Quadratura[], void>(
+  "conti/getQuadrature",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.get<Quadratura[]>("/controlli/quadrature");
+      return response.data;
+    } catch (error) {
+      const err = error as AxiosError;
+      return rejectWithValue(err.response?.data || "Errore quadrature");
+    }
+  },
+);
+
+/** Segna un saldo reale; poi rilegge l'elenco, che va ricalcolato tutto. */
+export const createQuadratura = createAsyncThunk<void, QuadraturaCreate>(
+  "conti/createQuadratura",
+  async (payload, { dispatch, rejectWithValue }) => {
+    try {
+      await api.post("/controlli/quadrature", {
+        ...payload,
+        conto_id: Number(payload.conto_id),
+      });
+      await dispatch(getQuadrature());
+    } catch (error) {
+      const err = error as AxiosError;
+      return rejectWithValue(err.response?.data || "Errore salvataggio quadratura");
+    }
+  },
+);
+
+export const deleteQuadratura = createAsyncThunk<void, { id: string }>(
+  "conti/deleteQuadratura",
+  async ({ id }, { dispatch, rejectWithValue }) => {
+    try {
+      await api.delete(`/controlli/quadrature/${id}`);
+      await dispatch(getQuadrature());
+    } catch (error) {
+      const err = error as AxiosError;
+      return rejectWithValue(err.response?.data || "Errore eliminazione quadratura");
     }
   },
 );

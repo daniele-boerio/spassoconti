@@ -2831,3 +2831,258 @@ def rifiuta_proposta_tag(db: Session, user_id: int, chiave: str, nome: str) -> N
     )
     if esiste is None:
         db.add(models.TagPropostaRifiutata(user_id=user_id, frase=chiave, nome=nome))
+
+
+# --- Doppioni e quadrature ---------------------------------------------------
+#
+# Due controlli che il confronto saldo/movimenti non può fare: un doppione è un
+# movimento valido che sposta il saldo in modo coerente, e un movimento mai
+# segnato non lascia traccia. Nessuno dei due sposta saldi: segnalano soltanto.
+
+
+def _chiave_doppione():
+    T = models.Transazione
+    return (
+        T.conto_id,
+        T.data,
+        T.tipo,
+        T.importo,
+        func.lower(func.trim(func.coalesce(T.descrizione, ""))),
+    )
+
+
+def trova_doppioni(db: Session, user_id: int) -> list[dict]:
+    """Gruppi di movimenti uguali: stesso conto, giorno, tipo, importo e descrizione.
+
+    Restano fuori quelli che l'utente ha segnato "non è un doppione". Ogni gruppo
+    ha i suoi movimenti, dal più vecchio (per id) al più nuovo.
+    """
+    T = models.Transazione
+    attivi = db.query(T).filter(
+        T.user_id == user_id, T.deleted_at.is_(None), T.non_doppione.is_(False)
+    )
+    chiave = _chiave_doppione()
+    gruppi = (
+        attivi.with_entities(*chiave)
+        .group_by(*chiave)
+        .having(func.count(T.id) > 1)
+        .order_by(T.data.desc())
+        .all()
+    )
+    risultato = []
+    for conto_id, giorno, tipo, importo, descrizione in gruppi:
+        righe = (
+            attivi.filter(
+                T.conto_id == conto_id,
+                T.data == giorno,
+                T.tipo == tipo,
+                T.importo == importo,
+                func.lower(func.trim(func.coalesce(T.descrizione, ""))) == descrizione,
+            )
+            .order_by(T.id)
+            .all()
+        )
+        if len(righe) > 1:
+            risultato.append(
+                {
+                    "data": giorno,
+                    "tipo": tipo,
+                    "importo": importo,
+                    "descrizione": righe[0].descrizione,
+                    "transazioni": righe,
+                }
+            )
+    return risultato
+
+
+def segna_non_doppioni(db: Session, user_id: int, ids: list[int]) -> int:
+    """Segna i movimenti come "non è un doppione". Non fa commit."""
+    if not ids:
+        return 0
+    T = models.Transazione
+    return (
+        db.query(T)
+        .filter(T.user_id == user_id, T.id.in_(ids), T.deleted_at.is_(None))
+        .update({"non_doppione": True}, synchronize_session=False)
+    )
+
+
+def movimenti_simili(
+    db: Session, user_id: int, giorno: date, tipo: str, importo: Decimal,
+    conto_id: Optional[int] = None,
+) -> list[models.Transazione]:
+    """Movimenti già registrati con stesso giorno, tipo e importo (e conto, se dato).
+
+    Per l'avviso "ce n'è già uno uguale" prima di salvare: la descrizione non
+    conta, perché lo stesso scontrino si scrive facilmente in due modi.
+    """
+    T = models.Transazione
+    q = db.query(T).filter(
+        T.user_id == user_id,
+        T.deleted_at.is_(None),
+        T.data == giorno,
+        T.tipo == tipo,
+        T.importo == importo,
+    )
+    if conto_id is not None:
+        q = q.filter(T.conto_id == conto_id)
+    return q.order_by(T.id).limit(5).all()
+
+
+def saldo_alla_data(db: Session, conto: models.Conto, giorno: date) -> Decimal:
+    """Il saldo del conto a fine giornata `giorno`, ricostruito dai movimenti.
+
+    Saldo attuale meno l'effetto dei movimenti successivi: la stessa regola di
+    `effetto_sul_conto`, scritta in SQL come `base_saldo_calcolata`.
+    """
+    db.flush()
+    T = models.Transazione
+    entrata = T.tipo.in_(("ENTRATA", "RIMBORSO"))
+    dopo = (
+        db.query(
+            func.coalesce(
+                func.sum(
+                    case(
+                        (and_(T.conto_id == conto.id, entrata), T.importo),
+                        (T.conto_id == conto.id, -T.importo),
+                        else_=0,
+                    )
+                    + case((T.conto_destinazione_id == conto.id, T.importo), else_=0)
+                ),
+                0,
+            )
+        )
+        .filter(
+            T.user_id == conto.user_id,
+            T.deleted_at.is_(None),
+            T.data > giorno,
+            or_(T.conto_id == conto.id, T.conto_destinazione_id == conto.id),
+        )
+        .scalar()
+    )
+    saldo = conto.saldo or Decimal("0")
+    return (saldo - Decimal(str(dopo or 0))).quantize(Decimal("0.01"))
+
+
+def stato_quadrature(db: Session, user_id: int) -> list[dict]:
+    """Le quadrature dell'utente, dalla più recente, ognuna confrontata con la precedente.
+
+    La prima quadratura di un conto è solo il punto di partenza: non si
+    controlla, così gli errori di prima non contano. Ogni successiva confronta il
+    suo saldo reale con quello che dovrebbe essere: il reale della precedente più
+    l'effetto dei movimenti registrati tra le due date (`atteso`).
+    `differenza` = atteso - reale: positiva vuol dire che nel periodo l'app conta
+    più soldi di quelli veri (un'uscita dimenticata, un'entrata di troppo),
+    negativa il contrario. Si ricalcola sempre: correggere un movimento del
+    periodo la fa tornare a zero. `ultima` segna la più recente di ogni conto,
+    l'unica che il controllo notturno guarda.
+    """
+    righe = (
+        db.query(models.Quadratura, models.Conto)
+        .join(models.Conto, models.Conto.id == models.Quadratura.conto_id)
+        .filter(
+            models.Quadratura.user_id == user_id,
+            models.Conto.user_id == user_id,
+            models.Conto.deleted_at.is_(None),
+        )
+        .order_by(models.Quadratura.data, models.Quadratura.id)
+        .all()
+    )
+    precedente: dict[int, tuple] = {}  # conto_id -> (quadratura, saldo app quel giorno)
+    stato = []
+    for q, conto in righe:
+        saldo_app = saldo_alla_data(db, conto, q.data)
+        voce = {
+            "id": q.id,
+            "conto_id": conto.id,
+            "conto_nome": conto.nome,
+            "data": q.data,
+            "saldo_reale": q.saldo_reale,
+            "precedente_data": None,
+            "movimenti_periodo": None,
+            "atteso": None,
+            "differenza": None,
+            "ultima": False,
+        }
+        if conto.id in precedente:
+            prima, saldo_app_prima = precedente[conto.id]
+            movimenti = saldo_app - saldo_app_prima
+            atteso = prima.saldo_reale + movimenti
+            voce.update(
+                precedente_data=prima.data,
+                movimenti_periodo=movimenti.quantize(Decimal("0.01")),
+                atteso=atteso.quantize(Decimal("0.01")),
+                differenza=(atteso - q.saldo_reale).quantize(Decimal("0.01")),
+            )
+        precedente[conto.id] = (q, saldo_app)
+        stato.append(voce)
+    ultime = {precedente[c][0].id for c in precedente}
+    for voce in stato:
+        voce["ultima"] = voce["id"] in ultime
+    stato.reverse()
+    return stato
+
+
+def problemi_controllo_conti(db: Session, user_id: int) -> dict:
+    """Quello che il controllo notturno segnala per un utente."""
+    return {
+        "doppioni": trova_doppioni(db, user_id),
+        "quadrature": [
+            q
+            for q in stato_quadrature(db, user_id)
+            if q["ultima"] and q["differenza"] not in (None, Decimal("0"))
+        ],
+    }
+
+
+@traccia_job("controllo_conti")
+def task_controllo_conti():
+    """Controllo notturno di doppioni e quadrature.
+
+    Ritorna quanti problemi ha trovato: come per `verifica_saldi`,
+    `GET /api/health/jobs` risponde 503 finché non tornano a zero e il monitor
+    del mattino manda la mail. Sono warning, non errori: un doppione può essere
+    giusto (si segna "non è un doppione") e una quadratura sbagliata è un dato
+    dell'utente, non un guasto. Chi ha le notifiche push riceve un avviso per
+    ogni problema nuovo, una volta sola.
+    """
+    db = SessionLocal()
+    totale = 0
+    try:
+        for (user_id,) in db.query(models.User.id).all():
+            try:
+                trovati = problemi_controllo_conti(db, user_id)
+                n = len(trovati["doppioni"]) + len(trovati["quadrature"])
+                if not n:
+                    continue
+                totale += n
+                logger.warning(
+                    "Controllo conti: utente %s, %s possibili doppioni, %s quadrature che non tornano",
+                    user_id, len(trovati["doppioni"]), len(trovati["quadrature"]),
+                )
+                for gruppo in trovati["doppioni"]:
+                    ids = "-".join(str(t.id) for t in gruppo["transazioni"])
+                    if _prima_volta(db, user_id, f"doppione:{ids}"):
+                        invia_notifica(
+                            db, user_id, "Possibile doppione",
+                            f"{gruppo['descrizione'] or gruppo['tipo'].capitalize()}: "
+                            f"{len(gruppo['transazioni'])} volte {_euro(gruppo['importo'])} "
+                            f"il {gruppo['data'].strftime('%d/%m')}.",
+                            url="/conti", tag="doppioni",
+                        )
+                for q in trovati["quadrature"]:
+                    if _prima_volta(db, user_id, f"quadratura:{q['id']}:{q['differenza']}"):
+                        invia_notifica(
+                            db, user_id, f"{q['conto_nome']}: i conti non tornano",
+                            f"Dal {q['precedente_data'].strftime('%d/%m')} al {q['data'].strftime('%d/%m')} "
+                            f"con i movimenti registrati dovevi avere {_euro(q['atteso'])}, "
+                            f"ne avevi {_euro(q['saldo_reale'])}.",
+                            url="/settings", tag="quadratura",
+                        )
+                db.commit()
+            except Exception:
+                db.rollback()
+                logger.exception("Controllo conti fallito per l'utente %s", user_id)
+    finally:
+        db.close()
+    return totale

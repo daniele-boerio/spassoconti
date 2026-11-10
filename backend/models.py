@@ -477,6 +477,10 @@ class Transazione(Base):
 
     importo_netto = Column(Numeric(10, 2), nullable=True)
 
+    # L'utente ha detto che non è un doppione: il controllo dei doppioni non lo
+    # segnala più (vedi services.trova_doppioni).
+    non_doppione = Column(Boolean, nullable=False, default=False)
+
     # Chiave scelta dal client per ogni salvataggio. Se la stessa richiesta
     # arriva due volte (rete caduta dopo il commit, coda offline che riprova),
     # la seconda restituisce la transazione già creata invece di duplicarla.
@@ -717,3 +721,25 @@ class JobRun(Base):
     # sfasati. None per i job che non contano niente.
     problemi = Column(Integer, nullable=True)
     messaggio = Column(String, nullable=True)
+
+
+class Quadratura(Base):
+    """"Il giorno X sul conto c'erano davvero Y euro", detto dall'utente.
+
+    Non sposta niente: è un punto di riferimento esterno. Il controllo notturno
+    confronta il saldo che l'app ricostruisce per quel giorno con quello reale e
+    segnala la differenza (un movimento dimenticato, un importo sbagliato).
+    """
+
+    __tablename__ = "quadrature"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    conto_id = Column(
+        Integer, ForeignKey("conti.id", ondelete="CASCADE"), nullable=False
+    )
+    data = Column(Date, nullable=False)
+    saldo_reale = Column(Numeric(10, 2), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))

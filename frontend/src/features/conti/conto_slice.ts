@@ -1,4 +1,11 @@
-import { correggiSaldo, getPatrimonio, getVerificaSaldi } from "./api_calls";
+import {
+  correggiSaldo,
+  getDoppioni,
+  getPatrimonio,
+  getQuadrature,
+  getVerificaSaldi,
+  ignoraDoppioni,
+} from "./api_calls";
 import { createSlice, PayloadAction, Action } from "@reduxjs/toolkit";
 import {
   confirmBankSession,
@@ -19,7 +26,11 @@ import {
   MonthlyBudgetResponse,
 } from "./interfaces";
 import { RootState } from "../../store/store";
-import { createTransaction } from "../transactions/api_calls";
+import {
+  createTransaction,
+  deleteTransaction,
+} from "../transactions/api_calls";
+import { mapTransaction } from "../transactions/transaction_slice";
 import { Transaction } from "../transactions/interfaces";
 
 // "Includi le ricorrenti future nel calcolo del budget": preferenza locale,
@@ -52,6 +63,8 @@ const initialState: ContoState = {
     localStorage.getItem(INCLUDE_FUTURE_RECURRING_STORAGE_KEY) === "true",
   patrimonio: [],
   saldiFuoriSincrono: [],
+  doppioni: [],
+  quadrature: [],
 };
 
 // --- HELPERS ---
@@ -114,6 +127,44 @@ const contoSlice = createSlice({
           saldo: Number(riga.saldo),
           saldo_atteso: Number(riga.saldo_atteso),
           differenza: Number(riga.differenza),
+        }));
+      })
+
+      .addCase(getDoppioni.fulfilled, (state, action) => {
+        state.doppioni = action.payload.map((gruppo) => ({
+          ...gruppo,
+          importo: Number(gruppo.importo),
+          transazioni: gruppo.transazioni.map(mapTransaction),
+        }));
+      })
+
+      .addCase(ignoraDoppioni.fulfilled, (state, action) => {
+        const ignorati = new Set(action.payload.map(String));
+        state.doppioni = state.doppioni.filter(
+          (gruppo) => !gruppo.transazioni.some((tx) => ignorati.has(String(tx.id))),
+        );
+      })
+
+      // Un movimento cancellato può chiudere un gruppo di doppioni.
+      .addCase(deleteTransaction.fulfilled, (state, action) => {
+        const id = String(action.payload);
+        state.doppioni = state.doppioni
+          .map((gruppo) => ({
+            ...gruppo,
+            transazioni: gruppo.transazioni.filter((tx) => String(tx.id) !== id),
+          }))
+          .filter((gruppo) => gruppo.transazioni.length > 1);
+      })
+
+      .addCase(getQuadrature.fulfilled, (state, action) => {
+        state.quadrature = action.payload.map((q) => ({
+          ...q,
+          id: String(q.id),
+          conto_id: String(q.conto_id),
+          saldo_reale: Number(q.saldo_reale),
+          movimenti_periodo: toNumber(q.movimenti_periodo),
+          atteso: toNumber(q.atteso),
+          differenza: toNumber(q.differenza),
         }));
       })
 
@@ -329,6 +380,10 @@ export const selectContiPatrimonio = (state: RootState) =>
   state.conto.patrimonio;
 export const selectSaldiFuoriSincrono = (state: RootState) =>
   state.conto.saldiFuoriSincrono;
+
+export const selectDoppioni = (state: RootState) => state.conto.doppioni;
+
+export const selectQuadrature = (state: RootState) => state.conto.quadrature;
 
 export const selectIncludeFutureRecurring = (state: RootState) =>
   state.conto.include_future_recurring;

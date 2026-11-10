@@ -55,7 +55,7 @@ from models import (
 )
 from rate_limit import limiter
 from routers.statistics import get_calculated_amount
-from services import importo_effettivo, verifica_saldi
+from services import importo_effettivo, stato_quadrature, verifica_saldi
 
 logger = logging.getLogger(__name__)
 
@@ -971,7 +971,8 @@ def tool_controllo_conti(db: Session, user_id: int, args: dict) -> dict:
             for t in q.order_by(Transazione.data, Transazione.id).limit(massimo).all()
         ]
 
-    # Doppioni: stesso giorno, tipo, importo e descrizione.
+    # Doppioni: stesso giorno, tipo, importo e descrizione (come il controllo
+    # notturno), senza quelli che l'utente ha segnato "non è un doppione".
     chiave = (
         Transazione.data,
         Transazione.tipo,
@@ -979,16 +980,28 @@ def tool_controllo_conti(db: Session, user_id: int, args: dict) -> dict:
         func.lower(func.trim(func.coalesce(Transazione.descrizione, ""))),
     )
     gruppi = (
-        periodo.order_by(None)
-        .with_entities(*chiave, func.count(Transazione.id))
-        .group_by(*chiave)
+        periodo.filter(Transazione.non_doppione.is_(False))
+        .order_by(None)
+        .with_entities(Transazione.conto_id, *chiave, func.count(Transazione.id))
+        .group_by(Transazione.conto_id, *chiave)
         .having(func.count(Transazione.id) > 1)
         .order_by(Transazione.data)
         .all()
     )
     doppioni = [
         {"data": str(d), "tipo": t, "importo": _d(i), "descrizione": desc, "volte": n}
-        for d, t, i, desc, n in gruppi
+        for _conto, d, t, i, desc, n in gruppi
+    ]
+    quadrature = [
+        {
+            "conto": q["conto_nome"],
+            "data": str(q["data"]),
+            "saldo_reale": _d(q["saldo_reale"]),
+            "dalla_quadratura_del": str(q["precedente_data"]) if q["precedente_data"] else None,
+            "atteso": _d(q["atteso"]) if q["atteso"] is not None else None,
+            "differenza": _d(q["differenza"]) if q["differenza"] is not None else None,
+        }
+        for q in stato_quadrature(db, user_id)
     ]
 
     netto_negativo = periodo.filter(
@@ -1033,6 +1046,7 @@ def tool_controllo_conti(db: Session, user_id: int, args: dict) -> dict:
             ],
         },
         "mesi": dict(sorted(mesi.items())),
+        "quadrature": quadrature[:massimo],
         "anomalie": {
             "possibili_doppioni": {"numero": len(doppioni), "righe": doppioni[:massimo]},
             "rimborsi_oltre_la_spesa": {
@@ -1048,7 +1062,11 @@ def tool_controllo_conti(db: Session, user_id: int, args: dict) -> dict:
         },
         "nota": "saldi.ok dice se il saldo di ogni conto torna con i suoi movimenti (la "
         "stessa verifica notturna dell'app). Le anomalie sono segnali da guardare, non "
-        "errori certi: due caffè uguali nello stesso giorno sono un doppione legittimo.",
+        "errori certi: due caffè uguali nello stesso giorno sono un doppione legittimo. "
+        "quadrature: i saldi reali che l'utente ha segnato (dalla più recente); la prima di "
+        "un conto è il punto di partenza, le altre hanno atteso = reale della precedente + "
+        "movimenti registrati in mezzo, e differenza = atteso - reale (diversa da zero: "
+        "manca un movimento o un importo è sbagliato in quel periodo).",
     }
 
 
@@ -1166,7 +1184,7 @@ TOOLS: dict[str, tuple[Callable[[Session, int, dict], dict], dict]] = {
             "description": "Verifica che i saldi tornino con i movimenti e cerca anomalie "
             "(possibili doppioni, rimborsi che superano la spesa, rimborsi datati prima "
             "della spesa, movimenti senza categoria o con data futura), con un riepilogo "
-            "mese per mese. Senza date: dal primo movimento a oggi.",
+            "mese per mese e le quadrature (saldi reali segnati dall'utente). Senza date: dal primo movimento a oggi.",
             "inputSchema": {"type": "object", "properties": {**_DATE}},
         },
     ),
