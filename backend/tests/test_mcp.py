@@ -272,3 +272,39 @@ def test_2fa_richiede_il_codice(api):
     # Il codice del passo appena usato per attivare non vale due volte: il successivo sì.
     r = _codice(api, client, codice=pyotp.TOTP(segreto).at(time.time() + 30))
     assert r.status_code == 302, r.text
+
+
+def test_controllo_conti_trova_le_anomalie(api):
+    mario = api.registra("mario")
+    conto = api.post("/conti", json={"nome": "Banca", "saldo": 100}, headers=mario).json()
+
+    def tx(**campi):
+        r = api.post("/transazioni", json={"conto_id": conto["id"], "tipo": "USCITA", **campi}, headers=mario)
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    tx(importo=15, data="2026-05-28", descrizione="Parrucchiere")
+    tx(importo=15, data="2026-05-28", descrizione="parrucchiere ")
+    spesa = tx(importo=10, data="2026-06-05", descrizione="Spesa Lidl")
+    tx(importo=12, data="2026-06-04", tipo="RIMBORSO", descrizione="Rimborso", parent_transaction_id=spesa["id"])
+
+    _, _, token = _token(api)
+    esito = _tool(api, token["access_token"], "controllo_conti", data_inizio="2026-05-01", data_fine="2026-06-30")
+
+    assert esito["saldi"]["ok"] is True
+    anomalie = esito["anomalie"]
+    assert anomalie["possibili_doppioni"]["numero"] == 1
+    assert anomalie["possibili_doppioni"]["righe"][0]["volte"] == 2
+    assert anomalie["rimborsi_oltre_la_spesa"]["righe"][0]["importo_netto_rimborsi"] == "-2.00"
+    assert anomalie["rimborso_prima_della_spesa"]["righe"][0]["data_spesa"] == "2026-06-05"
+    assert anomalie["senza_categoria"]["numero"] == 3
+    assert esito["mesi"]["2026-05"]["uscita"] == "30.00"
+
+    # Un saldo cambiato senza movimenti risulta come discrepanza.
+    with api.session_factory() as db:
+        c = db.query(models.Conto).filter(models.Conto.nome == "Banca").one()
+        c.saldo = c.saldo + 5
+        db.commit()
+    esito = _tool(api, token["access_token"], "controllo_conti")
+    assert esito["saldi"]["ok"] is False
+    assert esito["saldi"]["discrepanze"][0]["differenza"] == "5.00"
