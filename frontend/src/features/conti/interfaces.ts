@@ -1,3 +1,5 @@
+import { Transaction } from "../transactions/interfaces";
+
 // --- INTERFACCE ---
 
 export interface Conto {
@@ -41,6 +43,52 @@ export interface VerificaSaldo {
   /** Il saldo che avrebbe se ogni movimento l'avesse mosso giusto. */
   saldo_atteso: number;
   differenza: number;
+}
+
+/**
+ * Movimenti uguali (stesso conto, giorno, tipo, importo e descrizione): possibili
+ * doppioni dal controllo notturno (GET /controlli/doppioni).
+ */
+export interface Doppione {
+  data: string;
+  tipo: string;
+  importo: number;
+  descrizione: string;
+  transazioni: Transaction[];
+}
+
+/**
+ * Un saldo reale segnato dall'utente (GET /controlli/quadrature). Non sposta
+ * nulla: serve solo al controllo. La prima di un conto è il punto di partenza
+ * (atteso e differenza null); le altre confrontano il reale con quello della
+ * precedente più i movimenti registrati in mezzo.
+ */
+export interface Quadratura {
+  id: string;
+  conto_id: string;
+  conto_nome: string;
+  data: string;
+  saldo_reale: number;
+  precedente_data: string | null;
+  movimenti_periodo: number | null;
+  atteso: number | null;
+  /** atteso - reale: positiva se l'app conta più soldi di quelli veri. */
+  differenza: number | null;
+  /** La più recente del conto: l'unica che il controllo notturno guarda. */
+  ultima: boolean;
+}
+
+export interface QuadraturaCreate {
+  conto_id: string;
+  data: string;
+  saldo_reale: number;
+}
+
+export interface MovimentiSimiliParams {
+  data: string;
+  tipo: string;
+  importo: number;
+  conto_id?: string | null;
 }
 
 export interface PatrimonioPoint {
@@ -117,6 +165,10 @@ export interface ContoState {
   patrimonio: PatrimonioPoint[];
   /** Conti con il saldo fuori sincrono rispetto ai movimenti. Vuota = tutto ok. */
   saldiFuoriSincrono: VerificaSaldo[];
+  /** Possibili doppioni non ancora ignorati. */
+  doppioni: Doppione[];
+  /** Quadrature, dalla più recente. */
+  quadrature: Quadratura[];
 }
 
 // Interfaccia per il payload di aggiornamento budget

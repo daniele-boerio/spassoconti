@@ -120,3 +120,9 @@ from .open_banking import (
     BankSessionConfirm,
     BankSessionConfirmResponse,
 )
+from .controllo import (
+    DoppioneOut,
+    NonDoppioniIn,
+    QuadraturaCreate,
+    QuadraturaOut,
+)

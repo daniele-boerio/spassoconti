@@ -19,6 +19,7 @@ import { useI18n } from "../../../i18n/use-i18n";
 import Compensation from "./compensation/compensation";
 import { showToast } from "../../../features/ui/ui_slice";
 import { selectContiConti } from "../../../features/conti/conto_slice";
+import { getMovimentiSimili } from "../../../features/conti/api_calls";
 import { selectCategoriaCategorie } from "../../../features/categorie/categoria_slice";
 import { selectTagTags } from "../../../features/tags/tag_slice";
 import {
@@ -115,6 +116,11 @@ export default function TransactionDialog({
   // Proposta di tag dalla descrizione, chiesta quando si preme Salva (la
   // descrizione è di solito l'ultima cosa che si scrive). Vedi
   // services.suggerisci_tag sul BE e TagSuggestionSheet.
+  // Movimenti già salvati uguali a quello che si sta creando: la domanda
+  // "salvo lo stesso?" prima di un possibile doppione.
+  const [pendingDuplicates, setPendingDuplicates] = useState<
+    Transaction[] | null
+  >(null);
   const [pendingSuggestion, setPendingSuggestion] =
     useState<TagSuggestion | null>(null);
   const [applyingSuggestion, setApplyingSuggestion] = useState(false);
@@ -318,11 +324,38 @@ export default function TransactionDialog({
     };
   };
 
-  const handleSave = async () => {
+  const handleSave = async (duplicatesChecked = false) => {
     // Un secondo tocco mentre la prima richiesta è in volo (rete lenta) creava
     // un doppione: il bottone resta spento finché non torna la risposta.
     if (saving) return;
     setSaving(true);
+
+    // Solo in creazione e con la rete: c'è già un movimento con lo stesso
+    // giorno, tipo e importo? Allora si chiede prima di salvare.
+    const numericImporto = parseFloat(importo || "");
+    if (
+      !transaction &&
+      !duplicatesChecked &&
+      navigator.onLine &&
+      data &&
+      numericImporto > 0
+    ) {
+      const simili = (
+        await dispatch(
+          getMovimentiSimili({
+            data: toIsoDate(data),
+            tipo,
+            importo: numericImporto,
+            conto_id: contoId,
+          }),
+        )
+      ).payload as Transaction[];
+      if (simili.length > 0) {
+        setSaving(false);
+        setPendingDuplicates(simili);
+        return;
+      }
+    }
 
     // La descrizione si scrive per ultima: la proposta del tag arriva qui, e
     // solo in creazione, se il tag non l'ha scelto l'utente e i suggerimenti
@@ -568,7 +601,7 @@ export default function TransactionDialog({
         title={transaction ? t("edit_transaction") : t("new_transaction")}
         className="tx-sheet"
         footer={
-          <Button block disabled={!canSave || saving} onClick={handleSave}>
+          <Button block disabled={!canSave || saving} onClick={() => handleSave()}>
             {transaction ? t("save_changes") : t("tx_save")}
           </Button>
         }
@@ -812,6 +845,45 @@ export default function TransactionDialog({
           setTagTouched(true);
         }}
       />
+
+      <Sheet
+        open={pendingDuplicates !== null}
+        onClose={() => setPendingDuplicates(null)}
+        title={t("duplicate_warning_title")}
+        footer={
+          <>
+            <Button
+              variant="neutral"
+              block
+              onClick={() => setPendingDuplicates(null)}
+            >
+              {t("cancel")}
+            </Button>
+            <Button
+              block
+              disabled={saving}
+              onClick={() => {
+                setPendingDuplicates(null);
+                handleSave(true);
+              }}
+            >
+              {t("duplicate_warning_save")}
+            </Button>
+          </>
+        }
+      >
+        <p className="tx-duplicate__text">
+          {t("duplicate_warning_text")}
+        </p>
+        <ul className="tx-duplicate__list">
+          {pendingDuplicates?.map((tx) => (
+            <li key={tx.id}>
+              {tx.descrizione || t("no_description")} ·{" "}
+              <Amount value={tx.importo} />
+            </li>
+          ))}
+        </ul>
+      </Sheet>
 
       <TagSuggestionSheet
         open={pendingSuggestion !== null}

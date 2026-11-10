@@ -228,3 +228,21 @@
     padding: 2px 4px;
   }
 }
+
+// "C'è già un movimento uguale": la domanda prima di un possibile doppione.
+.tx-duplicate {
+  &__text {
+    margin: 0 0 12px;
+    font-size: 14px;
+    line-height: 1.45;
+    color: v.$muted;
+  }
+
+  &__list {
+    margin: 0;
+    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+}

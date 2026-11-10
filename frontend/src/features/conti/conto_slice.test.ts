@@ -29,8 +29,11 @@ import reducer, { setIncludeFutureRecurring } from "./conto_slice";
 import {
   getCurrentMonthExpenses,
   getCurrentMonthExpensesByCategory,
+  getDoppioni,
+  getQuadrature,
+  ignoraDoppioni,
 } from "./api_calls";
-import { createTransaction } from "../transactions/api_calls";
+import { createTransaction, deleteTransaction } from "../transactions/api_calls";
 import { Transaction } from "../transactions/interfaces";
 import api from "../../services/api";
 import { RootState } from "../../store/store";
@@ -229,5 +232,47 @@ describe("getCurrentMonthExpenses", () => {
     expect(apiGet).toHaveBeenCalledWith(
       "/conti/currentMonthExpenses?include_future_recurring=false",
     );
+  });
+});
+
+describe("doppioni e quadrature", () => {
+  const tx = (id: number) =>
+    ({ id, importo: "15.00", importo_netto: null }) as unknown as Transaction;
+
+  it("converte i doppioni e li toglie quando sono ignorati o cancellati", () => {
+    let state = reducer(
+      initial,
+      getDoppioni.fulfilled(
+        [
+          { data: "2026-05-28", tipo: "USCITA", importo: "15.00" as unknown as number, descrizione: "Parrucchiere", transazioni: [tx(1), tx(2)] },
+          { data: "2026-05-10", tipo: "USCITA", importo: "8.00" as unknown as number, descrizione: "Penny", transazioni: [tx(3), tx(4)] },
+        ],
+        "r",
+      ),
+    );
+    expect(state.doppioni[0].importo).toBe(15);
+    expect(state.doppioni[0].transazioni[0].importo).toBe(15);
+
+    state = reducer(state, ignoraDoppioni.fulfilled(["1", "2"], "r", { ids: ["1", "2"] }));
+    expect(state.doppioni.map((g) => g.descrizione)).toEqual(["Penny"]);
+
+    // Cancellato quello di troppo, il gruppo non ha più doppioni.
+    state = reducer(state, deleteTransaction.fulfilled("4", "r", { id: "4" }));
+    expect(state.doppioni).toEqual([]);
+  });
+
+  it("converte le quadrature lasciando null il punto di partenza", () => {
+    const state = reducer(
+      initial,
+      getQuadrature.fulfilled(
+        [
+          { id: 2, conto_id: 7, conto_nome: "Banca", data: "2026-11-09", saldo_reale: "1140.00", precedente_data: "2026-10-31", movimenti_periodo: "-50.00", atteso: "1150.00", differenza: "10.00", ultima: true },
+          { id: 1, conto_id: 7, conto_nome: "Banca", data: "2026-10-31", saldo_reale: "1200.00", precedente_data: null, movimenti_periodo: null, atteso: null, differenza: null, ultima: false },
+        ] as never,
+        "r",
+      ),
+    );
+    expect(state.quadrature[0]).toMatchObject({ id: "2", conto_id: "7", saldo_reale: 1140, atteso: 1150, differenza: 10 });
+    expect(state.quadrature[1]).toMatchObject({ atteso: null, differenza: null });
   });
 });

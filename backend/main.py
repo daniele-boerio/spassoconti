@@ -27,6 +27,7 @@ from services import (
     task_pulizia_refresh_token,
     task_notifiche_budget,
     task_promemoria_ricorrenze,
+    task_controllo_conti,
 )
 from routers import (
     admin,
@@ -49,6 +50,7 @@ from routers import (
     passkey,
     notifiche,
     mcp,
+    controlli,
 )
 
 logger = logging.getLogger(__name__)
@@ -88,6 +90,8 @@ scheduler.add_job(task_snapshot_patrimonio, "cron", hour=1, minute=30)
 scheduler.add_job(task_ricarica_automatica_conti, "cron", hour=4, minute=0)
 # Dopo ricorrenze e ricariche: controlla che ogni saldo torni con i movimenti.
 scheduler.add_job(task_verifica_saldi, "cron", hour=4, minute=30)
+# Doppioni e quadrature: dopo la verifica saldi, prima del monitor delle 5:15.
+scheduler.add_job(task_controllo_conti, "cron", hour=4, minute=45)
 # I refresh token scaduti da più di una settimana: nessuno li toglieva.
 scheduler.add_job(task_pulizia_refresh_token, "cron", hour=5, minute=0)
 # Ogni 6 ore (4 volte/giorno): le API AIS (PSD2) limitano gli accessi non
@@ -254,6 +258,7 @@ api.include_router(two_factor.router)  # Verifica in due passaggi (/auth/2fa)
 api.include_router(passkey.router)  # Passkey / accesso biometrico (/auth/passkey)
 api.include_router(notifiche.router)  # Notifiche push
 api.include_router(admin.router)  # Admin: lista utenti e ban
+api.include_router(controlli.router)  # Doppioni e quadrature
 api.include_router(mcp.router)  # Server MCP in sola lettura (/mcp) + OAuth (/mcp/oauth)
 
 
@@ -285,6 +290,7 @@ FRESCHEZZA_JOB = {
     # Ogni mezz'ora dalle 6 alle 20:30 UTC: di notte il buco più lungo è ~10 ore.
     "notifiche_budget": timedelta(hours=11),
     "promemoria_ricorrenze": timedelta(hours=26),
+    "controllo_conti": timedelta(hours=26),
 }
 
 

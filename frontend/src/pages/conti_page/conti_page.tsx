@@ -25,6 +25,7 @@ import {
   getConti,
   getPatrimonio,
   getVerificaSaldi,
+  getDoppioni,
   updateConto,
 } from "../../features/conti/api_calls";
 import { Conto } from "../../features/conti/interfaces";
@@ -38,6 +39,7 @@ import { getInvestimenti } from "../../features/investimenti/api_calls";
 import { selectInvestimenti } from "../../features/investimenti/investimento_slice";
 import { showToast } from "../../features/ui/ui_slice";
 import SaldiCheck from "../../components/saldi_check/saldi_check";
+import DoppioniCheck from "../../components/doppioni_check/doppioni_check";
 import { relativeTime } from "../../services/dates";
 
 const localeTag = () => (getLocale() === "it" ? "it-IT" : "en-GB");
@@ -95,6 +97,8 @@ export default function ContiPage() {
     dispatch(getPatrimonio());
     // Saldi che non tornano con i movimenti: di norma nessuno.
     dispatch(getVerificaSaldi());
+    // Possibili doppioni, gli stessi del controllo notturno.
+    dispatch(getDoppioni());
   }, [dispatch]);
 
   // Il conto che l'app ha aperto da sé non compare in elenco: esiste perché
@@ -336,6 +340,7 @@ export default function ContiPage() {
 
         <PageContent>
           <SaldiCheck />
+          <DoppioniCheck />
 
           {loading && conti.length === 0 && (
             <Card>

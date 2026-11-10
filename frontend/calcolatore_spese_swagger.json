@@ -6520,6 +6520,287 @@
           }
         }
       }
+    },
+    "/api/controlli/doppioni": {
+      "get": {
+        "tags": [
+          "Controlli"
+        ],
+        "summary": "Get Doppioni",
+        "description": "Gruppi di movimenti uguali ancora da guardare. Lista vuota = nessuno.",
+        "operationId": "get_doppioni_api_controlli_doppioni_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DoppioneOut"
+                  },
+                  "type": "array",
+                  "title": "Response Get Doppioni Api Controlli Doppioni Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/controlli/doppioni/ignora": {
+      "post": {
+        "tags": [
+          "Controlli"
+        ],
+        "summary": "Ignora Doppioni",
+        "description": "\"Non è un doppione\": questi movimenti non vengono più segnalati.",
+        "operationId": "ignora_doppioni_api_controlli_doppioni_ignora_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NonDoppioniIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/controlli/simili": {
+      "get": {
+        "tags": [
+          "Controlli"
+        ],
+        "summary": "Get Simili",
+        "description": "Movimenti già salvati con stesso giorno, tipo e importo: l'avviso prima di salvare.",
+        "operationId": "get_simili_api_controlli_simili_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "data",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Data"
+            }
+          },
+          {
+            "name": "tipo",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/TipoTransazione"
+            }
+          },
+          {
+            "name": "importo",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0.0
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                }
+              ],
+              "title": "Importo"
+            }
+          },
+          {
+            "name": "conto_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Conto Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TransazioneOut"
+                  },
+                  "title": "Response Get Simili Api Controlli Simili Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/controlli/quadrature": {
+      "get": {
+        "tags": [
+          "Controlli"
+        ],
+        "summary": "Get Quadrature",
+        "description": "Le quadrature, dalla più recente, con la differenza ricalcolata adesso.",
+        "operationId": "get_quadrature_api_controlli_quadrature_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/QuadraturaOut"
+                  },
+                  "type": "array",
+                  "title": "Response Get Quadrature Api Controlli Quadrature Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Controlli"
+        ],
+        "summary": "Create Quadratura",
+        "operationId": "create_quadratura_api_controlli_quadrature_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuadraturaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuadraturaOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/controlli/quadrature/{quadratura_id}": {
+      "delete": {
+        "tags": [
+          "Controlli"
+        ],
+        "summary": "Delete Quadratura",
+        "operationId": "delete_quadratura_api_controlli_quadrature__quadratura_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "quadratura_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Quadratura Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -8219,6 +8500,51 @@
         "type": "object",
         "title": "DebitoUpdate"
       },
+      "DoppioneOut": {
+        "properties": {
+          "data": {
+            "type": "string",
+            "format": "date",
+            "title": "Data"
+          },
+          "tipo": {
+            "type": "string",
+            "title": "Tipo"
+          },
+          "importo": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Importo"
+          },
+          "descrizione": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descrizione"
+          },
+          "transazioni": {
+            "items": {
+              "$ref": "#/components/schemas/TransazioneOut"
+            },
+            "type": "array",
+            "title": "Transazioni"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "tipo",
+          "importo",
+          "transazioni"
+        ],
+        "title": "DoppioneOut",
+        "description": "Movimenti uguali: stesso conto, giorno, tipo, importo e descrizione."
+      },
       "ExpenseCompositionOut": {
         "properties": {
           "categoria": {
@@ -8579,6 +8905,23 @@
         ],
         "title": "MonthlySavingsOut"
       },
+      "NonDoppioniIn": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ids"
+        ],
+        "title": "NonDoppioniIn",
+        "description": "Gli id dei movimenti da non segnalare più come doppioni."
+      },
       "NotificaProvaOut": {
         "properties": {
           "inviate": {
@@ -8855,6 +9198,127 @@
           "endpoint"
         ],
         "title": "PushSubscriptionRemove"
+      },
+      "QuadraturaCreate": {
+        "properties": {
+          "conto_id": {
+            "type": "integer",
+            "title": "Conto Id"
+          },
+          "data": {
+            "type": "string",
+            "format": "date",
+            "title": "Data"
+          },
+          "saldo_reale": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Saldo Reale"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conto_id",
+          "data",
+          "saldo_reale"
+        ],
+        "title": "QuadraturaCreate"
+      },
+      "QuadraturaOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "conto_id": {
+            "type": "integer",
+            "title": "Conto Id"
+          },
+          "conto_nome": {
+            "type": "string",
+            "title": "Conto Nome"
+          },
+          "data": {
+            "type": "string",
+            "format": "date",
+            "title": "Data"
+          },
+          "saldo_reale": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Saldo Reale"
+          },
+          "precedente_data": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Precedente Data"
+          },
+          "movimenti_periodo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Movimenti Periodo"
+          },
+          "atteso": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Atteso"
+          },
+          "differenza": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Differenza"
+          },
+          "ultima": {
+            "type": "boolean",
+            "title": "Ultima"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "conto_id",
+          "conto_nome",
+          "data",
+          "saldo_reale",
+          "ultima"
+        ],
+        "title": "QuadraturaOut",
+        "description": "Una quadratura confrontata con la precedente dello stesso conto.\n\nLa prima di un conto è il punto di partenza: `precedente_data`, `atteso` e\n`differenza` sono null. Per le altre `atteso` = reale della precedente +\n`movimenti_periodo` (l'effetto dei movimenti registrati tra le due date) e\n`differenza` = `atteso` - `saldo_reale`: positiva se l'app conta più soldi di\nquelli veri. `ultima` è la più recente del conto, l'unica che il controllo\nnotturno guarda."
       },
       "RecoveryCodesOut": {
         "properties": {
