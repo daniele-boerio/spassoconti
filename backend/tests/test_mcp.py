@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 from datetime import date
+from decimal import Decimal
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -133,6 +134,8 @@ def test_flusso_completo_e_strumenti(api):
 
     conti = _tool(api, access, "conti")
     assert conti["conti"][0]["saldo"] == "1450.00"
+    # Il totale somma tutti i conti, compreso il Portafoglio virtuale dell'app.
+    assert conti["totale"] == str(sum(Decimal(c["saldo"]) for c in conti["conti"]))
 
     mov = _tool(api, access, "movimenti", categoria="spesa", tipo="USCITA")
     assert mov["numero_movimenti"] == 2
