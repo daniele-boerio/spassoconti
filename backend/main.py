@@ -48,6 +48,7 @@ from routers import (
     two_factor,
     passkey,
     notifiche,
+    mcp,
 )
 
 logger = logging.getLogger(__name__)
@@ -253,6 +254,7 @@ api.include_router(two_factor.router)  # Verifica in due passaggi (/auth/2fa)
 api.include_router(passkey.router)  # Passkey / accesso biometrico (/auth/passkey)
 api.include_router(notifiche.router)  # Notifiche push
 api.include_router(admin.router)  # Admin: lista utenti e ban
+api.include_router(mcp.router)  # Server MCP in sola lettura (/mcp) + OAuth (/mcp/oauth)
 
 
 # Il healthcheck del container. Tocca il database apposta: un BE che risponde ma
@@ -330,6 +332,8 @@ def health_jobs(db: Session = Depends(get_db)):
 
 
 app.include_router(api)
+# Scoperta OAuth per i client MCP: per specifica sta alla radice del dominio.
+app.include_router(mcp.well_known)
 
 
 if __name__ == "__main__":
