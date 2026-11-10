@@ -17,6 +17,11 @@ Alembic migrations, JWT bearer auth, APScheduler background jobs.
   `apply_filters_and_sort(query, model, filters)` helper. There is no `services/`
   package.
 - `rate_limit.py` — shared slowapi `limiter` for rate-limited endpoints.
+- `routers/mcp.py` — read-only MCP server for assistants (`POST /api/mcp`) with its own
+  stateless OAuth (HMAC-signed blobs keyed on SECRET_KEY, PKCE, tokens carry
+  `token_version`); discovery at `/.well-known/oauth-*` on the root app, proxied by a
+  dedicated nginx location. New tools: user-scoped, soft-delete aware, same helpers as
+  `routers/statistics.py`.
 - `tests/` — pytest on in-memory SQLite (`db_session` fixture in `tests/conftest.py`);
   tests call endpoint functions directly, the auth flow uses `TestClient`.
 
