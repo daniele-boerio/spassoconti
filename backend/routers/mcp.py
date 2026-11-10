@@ -55,7 +55,7 @@ from models import (
 )
 from rate_limit import limiter
 from routers.statistics import get_calculated_amount
-from services import importo_effettivo
+from services import importo_effettivo, verifica_saldi
 
 logger = logging.getLogger(__name__)
 
@@ -935,6 +935,123 @@ def tool_ricorrenze(db: Session, user_id: int, args: dict) -> dict:
     }
 
 
+def tool_controllo_conti(db: Session, user_id: int, args: dict) -> dict:
+    """Riepilogo mese per mese più i segnali di qualcosa che non torna."""
+    oggi = date.today()
+    prima = (
+        _movimenti_utente(db, user_id).with_entities(func.min(Transazione.data)).scalar()
+    )
+    inizio = _data(args.get("data_inizio"), "data_inizio") or prima or oggi.replace(day=1)
+    fine = _data(args.get("data_fine"), "data_fine") or oggi
+    if fine < inizio:
+        raise ValueError("data_fine precede data_inizio")
+    massimo = 30  # righe per tipo di anomalia: il conteggio resta completo
+
+    # Saldi: la stessa verifica del job notturno. Può "fotografare" un conto mai
+    # verificato: qui si butta via, lo strumento non scrive.
+    try:
+        discrepanze = verifica_saldi(db, user_id)
+    finally:
+        db.rollback()
+
+    periodo = _movimenti_utente(db, user_id).filter(
+        Transazione.data >= inizio, Transazione.data <= fine
+    )
+
+    def righe(q, extra=()):
+        return [
+            {
+                "data": str(t.data),
+                "tipo": t.tipo,
+                "importo": _d(t.importo),
+                **({"importo_netto_rimborsi": _d(t.importo_netto)} if t.importo_netto is not None else {}),
+                "descrizione": t.descrizione,
+                **{k: f(t) for k, f in extra},
+            }
+            for t in q.order_by(Transazione.data, Transazione.id).limit(massimo).all()
+        ]
+
+    # Doppioni: stesso giorno, tipo, importo e descrizione.
+    chiave = (
+        Transazione.data,
+        Transazione.tipo,
+        Transazione.importo,
+        func.lower(func.trim(func.coalesce(Transazione.descrizione, ""))),
+    )
+    gruppi = (
+        periodo.order_by(None)
+        .with_entities(*chiave, func.count(Transazione.id))
+        .group_by(*chiave)
+        .having(func.count(Transazione.id) > 1)
+        .order_by(Transazione.data)
+        .all()
+    )
+    doppioni = [
+        {"data": str(d), "tipo": t, "importo": _d(i), "descrizione": desc, "volte": n}
+        for d, t, i, desc, n in gruppi
+    ]
+
+    netto_negativo = periodo.filter(
+        Transazione.tipo == "USCITA", Transazione.importo_netto < 0
+    )
+    padre = db.query(Transazione).filter(Transazione.user_id == user_id).subquery()
+    rimborso_prima = (
+        periodo.join(padre, padre.c.id == Transazione.parent_transaction_id)
+        .filter(Transazione.tipo == "RIMBORSO", Transazione.data < padre.c.data)
+    )
+    senza_categoria = periodo.filter(
+        Transazione.tipo.in_(("USCITA", "ENTRATA")), Transazione.categoria_id.is_(None)
+    )
+    futuri = periodo.filter(Transazione.data > oggi)
+
+    anno_col = extract("year", Transazione.data)
+    mese_col = extract("month", Transazione.data)
+    per_mese = (
+        periodo.order_by(None)
+        .with_entities(anno_col, mese_col, Transazione.tipo, func.count(Transazione.id), func.sum(importo_effettivo()))
+        .group_by(anno_col, mese_col, Transazione.tipo)
+        .all()
+    )
+    mesi: dict[str, dict] = {}
+    for y, m, tipo, n, somma in per_mese:
+        voce = mesi.setdefault(f"{int(y)}-{int(m):02d}", {"movimenti": 0})
+        voce["movimenti"] += n
+        voce[tipo.lower()] = _d(somma)
+    for voce in mesi.values():
+        voce["netto"] = _d(
+            Decimal(voce.get("entrata") or 0) - Decimal(voce.get("uscita") or 0)
+            - Decimal(voce.get("accantonamento") or 0)
+        )
+
+    return {
+        "periodo": {"da": str(inizio), "a": str(fine)},
+        "saldi": {
+            "ok": not discrepanze,
+            "discrepanze": [
+                {k: (_d(v) if isinstance(v, Decimal) else v) for k, v in d.items() if k != "conto_id"}
+                for d in discrepanze
+            ],
+        },
+        "mesi": dict(sorted(mesi.items())),
+        "anomalie": {
+            "possibili_doppioni": {"numero": len(doppioni), "righe": doppioni[:massimo]},
+            "rimborsi_oltre_la_spesa": {
+                "numero": netto_negativo.count(),
+                "righe": righe(netto_negativo),
+            },
+            "rimborso_prima_della_spesa": {
+                "numero": rimborso_prima.count(),
+                "righe": righe(rimborso_prima, (("data_spesa", lambda t: str(t.parent_transaction.data)),)),
+            },
+            "senza_categoria": {"numero": senza_categoria.count(), "righe": righe(senza_categoria)},
+            "date_future": {"numero": futuri.count(), "righe": righe(futuri)},
+        },
+        "nota": "saldi.ok dice se il saldo di ogni conto torna con i suoi movimenti (la "
+        "stessa verifica notturna dell'app). Le anomalie sono segnali da guardare, non "
+        "errori certi: due caffè uguali nello stesso giorno sono un doppione legittimo.",
+    }
+
+
 _DATE = {
     "data_inizio": {"type": "string", "description": "AAAA-MM-GG, incluso"},
     "data_fine": {"type": "string", "description": "AAAA-MM-GG, incluso"},
@@ -1040,6 +1157,17 @@ TOOLS: dict[str, tuple[Callable[[Session, int, dict], dict], dict]] = {
                 "type": "object",
                 "properties": {"giorni": {"type": "integer", "minimum": 0, "maximum": 366, "default": 30}},
             },
+        },
+    ),
+    "controllo_conti": (
+        tool_controllo_conti,
+        {
+            "title": "Controllo dei conti",
+            "description": "Verifica che i saldi tornino con i movimenti e cerca anomalie "
+            "(possibili doppioni, rimborsi che superano la spesa, rimborsi datati prima "
+            "della spesa, movimenti senza categoria o con data futura), con un riepilogo "
+            "mese per mese. Senza date: dal primo movimento a oggi.",
+            "inputSchema": {"type": "object", "properties": {**_DATE}},
         },
     ),
 }
