@@ -593,7 +593,7 @@ def tool_conti(db: Session, user_id: int, args: dict) -> dict:
         .order_by(Conto.nome)
         .all()
     )
-    totale = sum((c.saldo or Decimal("0") for c in conti if not c.virtuale), Decimal("0"))
+    totale = sum((c.saldo or Decimal("0") for c in conti), Decimal("0"))
     return {
         "conti": [
             {
@@ -605,8 +605,9 @@ def tool_conti(db: Session, user_id: int, args: dict) -> dict:
             }
             for c in conti
         ],
-        "totale_conti_reali": _d(totale),
-        "nota": "I conti virtuali (salvadanai, accantonamenti) non entrano nel totale.",
+        "totale": _d(totale),
+        "nota": "Un conto 'virtuale' è il Portafoglio aperto dall'app per chi non "
+        "registra i propri conti: i movimenti senza conto finiscono lì.",
     }
 
 
