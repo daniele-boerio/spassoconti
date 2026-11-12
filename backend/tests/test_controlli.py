@@ -122,3 +122,20 @@ def test_job_notturno_conta_doppioni_e_quadrature(api):
         riga = db.query(models.JobRun).filter(models.JobRun.nome == "controllo_conti").one()
         assert riga.problemi == 2
         assert riga.esito == "ok"
+
+
+def test_il_monitor_conta_solo_i_problemi_dell_admin(api, monkeypatch):
+    """Il controllo gira su tutti, ma il 503 del mattino è solo per l'admin."""
+    monkeypatch.setenv("ADMIN_EMAIL", "mario@example.it")
+    luigi = api.registra("luigi")
+    conto = _conto(api, luigi)
+    _tx(api, luigi, conto)
+    _tx(api, luigi, conto)
+    assert services.task_controllo_conti() == 0  # i doppioni di luigi non contano
+    assert len(api.get("/controlli/doppioni", headers=luigi).json()) == 1  # ma restano
+
+    mario = api.registra("mario")
+    conto = _conto(api, mario)
+    _tx(api, mario, conto)
+    _tx(api, mario, conto)
+    assert services.task_controllo_conti() == 1
