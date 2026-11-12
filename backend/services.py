@@ -15,6 +15,7 @@ from pywebpush import WebPushException, webpush
 import jwt  # PyJWT (vedi auth.py: python-jose è stato tolto)
 from datetime import date, timedelta, datetime, timezone
 import logging
+from auth import email_admin
 from database import SessionLocal
 import models
 from dateutil.relativedelta import relativedelta
@@ -623,6 +624,22 @@ def verifica_saldi(db: Session, user_id: int) -> list[dict]:
     return discrepanze
 
 
+def conta_per_il_monitor(db: Session, user_id: int) -> bool:
+    """Se i problemi di dati di questo utente fanno rispondere 503 a /api/health/jobs.
+
+    Il monitor del mattino (`.github/workflows/jobs.yml`) manda la mail
+    all'amministratore (`auth.email_admin()`): i saldi sfasati, i doppioni e le
+    quadrature degli altri account sono affar loro (li vedono nell'app e con le
+    push) e non devono far diventare rosso il suo controllo. Senza admin
+    configurato contano tutti. I guasti veri (un job che solleva) contano sempre.
+    """
+    admin = email_admin()
+    if not admin:
+        return True
+    email = db.query(models.User.email).filter(models.User.id == user_id).scalar()
+    return bool(email and email.strip().lower() == admin)
+
+
 @traccia_job("verifica_saldi")
 def task_verifica_saldi():
     """Controllo notturno: fotografa i conti nuovi e segnala i saldi sfasati.
@@ -630,7 +647,8 @@ def task_verifica_saldi():
     Ritorna quanti conti sono sfasati: `traccia_job` lo salva in `job_runs` e
     `GET /api/health/jobs` risponde 503 finché non tornano a zero (il monitor
     del mattino manda la mail). Lo sfasamento è un ERROR, non un warning: vuol
-    dire soldi che non tornano.
+    dire soldi che non tornano. Il controllo gira su tutti, ma conta (ed è un
+    ERROR) solo per chi guarda il monitor: vedi `conta_per_il_monitor`.
     """
     db = SessionLocal()
     sfasati = 0
@@ -638,9 +656,11 @@ def task_verifica_saldi():
     try:
         for (user_id,) in db.query(models.User.id).all():
             try:
+                del_monitor = conta_per_il_monitor(db, user_id)
                 for riga in verifica_saldi(db, user_id):
-                    sfasati += 1
-                    logger.error(
+                    if del_monitor:
+                        sfasati += 1
+                    (logger.error if del_monitor else logger.warning)(
                         "Saldo fuori sincrono: utente %s conto %s, saldo %s, atteso %s",
                         user_id,
                         riga["conto_id"],
@@ -3039,7 +3059,8 @@ def problemi_controllo_conti(db: Session, user_id: int) -> dict:
 def task_controllo_conti():
     """Controllo notturno di doppioni e quadrature.
 
-    Ritorna quanti problemi ha trovato: come per `verifica_saldi`,
+    Ritorna quanti problemi ha trovato (solo quelli che contano per il monitor,
+    `conta_per_il_monitor`): come per `verifica_saldi`,
     `GET /api/health/jobs` risponde 503 finché non tornano a zero e il monitor
     del mattino manda la mail. Sono warning, non errori: un doppione può essere
     giusto (si segna "non è un doppione") e una quadratura sbagliata è un dato
@@ -3055,7 +3076,8 @@ def task_controllo_conti():
                 n = len(trovati["doppioni"]) + len(trovati["quadrature"])
                 if not n:
                     continue
-                totale += n
+                if conta_per_il_monitor(db, user_id):
+                    totale += n
                 logger.warning(
                     "Controllo conti: utente %s, %s possibili doppioni, %s quadrature che non tornano",
                     user_id, len(trovati["doppioni"]), len(trovati["quadrature"]),

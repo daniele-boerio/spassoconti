@@ -163,3 +163,20 @@ def test_scheduler_spento_non_segnala_niente(api, monkeypatch):
 
     assert r.status_code == 200
     assert r.json()["scheduler"] == "disabled"
+
+
+def test_saldo_sfasato_di_un_altro_utente_non_fa_rispondere_503(api, monkeypatch):
+    monkeypatch.setenv("ADMIN_EMAIL", "admin@example.it")
+    headers = api.registra("luigi")
+    conto = _conto(api, headers)
+    task_verifica_saldi()
+
+    db = api.session_factory()
+    db.get(models.Conto, conto["id"]).saldo += 5
+    db.commit()
+    db.close()
+
+    assert task_verifica_saldi() == 0
+    riga = _riga(api, "verifica_saldi")
+    assert (riga.esito, riga.errori, riga.problemi) == ("ok", 0, 0)
+    assert api.get("/health/jobs").status_code == 200
