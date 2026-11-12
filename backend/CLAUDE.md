@@ -110,7 +110,9 @@ def create_xxx(
   records each run in `job_runs` (esito ok/errori/fallito, counting ERROR logs of
   the job's thread; an `int` return value is stored as `problemi`). `GET
   /api/health/jobs` turns that into 503 when a job failed, is late (`FRESCHEZZA_JOB`
-  in main.py) or `verifica_saldi` found mismatches; `.github/workflows/jobs.yml`
+  in main.py) or `verifica_saldi`/`controllo_conti` found problems on the admin's
+  account (`conta_per_il_monitor`: other users' data problems are only logged and
+  pushed); `.github/workflows/jobs.yml`
   checks it every morning and GitHub emails on failure. A new job needs both the
   decorator and an entry in `FRESCHEZZA_JOB`. Keep `/api/health` (the container
   healthcheck) DB-only: job problems must not mark the container unhealthy.
