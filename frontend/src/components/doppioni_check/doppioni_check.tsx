@@ -13,8 +13,8 @@ import "../saldi_check/saldi_check.scss";
 
 /**
  * Movimenti uguali (stesso conto, giorno, tipo, importo e descrizione), gli
- * stessi che il controllo notturno segnala. Due uscite: vederli nei Movimenti
- * (filtrati su quel giorno, conto, tipo e descrizione) e cancellare quello di
+ * stessi che il controllo notturno segnala. Due uscite: guardare i Movimenti di
+ * quel giorno (tutti, per capire se è davvero un doppione) e cancellare quello di
  * troppo, oppure dire "non è un doppione" (due caffè uguali nello stesso giorno
  * capitano) e il gruppo non torna più.
  */
