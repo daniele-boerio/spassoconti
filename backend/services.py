@@ -8,6 +8,7 @@ import re
 import threading
 import time
 import unicodedata
+from urllib.parse import urlencode
 import requests
 import yfinance as yf
 from cryptography.fernet import Fernet, InvalidToken
@@ -2915,6 +2916,23 @@ def trova_doppioni(db: Session, user_id: int) -> list[dict]:
     return risultato
 
 
+def link_movimenti_doppione(gruppo: dict) -> str:
+    """I Movimenti filtrati sul gruppo (giorno, conto, tipo, descrizione).
+
+    Stessi parametri di `linkMovimenti` nel FE (`features/conti/doppioni.ts`):
+    la push porta dritta ai doppioni, da cui si elimina quello di troppo.
+    """
+    giorno = gruppo["data"].isoformat()
+    params = {"periodo": "custom", "da": giorno, "a": giorno, "tipo": gruppo["tipo"]}
+    conto_id = gruppo["transazioni"][0].conto_id
+    if conto_id is not None:
+        params["conti"] = str(conto_id)
+    descrizione = (gruppo["descrizione"] or "").strip()
+    if descrizione:
+        params["q"] = descrizione
+    return "/transactions?" + urlencode(params)
+
+
 def segna_non_doppioni(db: Session, user_id: int, ids: list[int]) -> int:
     """Segna i movimenti come "non è un doppione". Non fa commit."""
     if not ids:
@@ -3090,7 +3108,7 @@ def task_controllo_conti():
                             f"{gruppo['descrizione'] or gruppo['tipo'].capitalize()}: "
                             f"{len(gruppo['transazioni'])} volte {_euro(gruppo['importo'])} "
                             f"il {gruppo['data'].strftime('%d/%m')}.",
-                            url="/conti", tag="doppioni",
+                            url=link_movimenti_doppione(gruppo), tag="doppioni",
                         )
                 for q in trovati["quadrature"]:
                     if _prima_volta(db, user_id, f"quadratura:{q['id']}:{q['differenza']}"):

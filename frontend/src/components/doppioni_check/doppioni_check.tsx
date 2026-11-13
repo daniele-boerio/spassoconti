@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../store/store";
 import { ignoraDoppioni } from "../../features/conti/api_calls";
 import { selectDoppioni } from "../../features/conti/conto_slice";
-import { openSheet, showToast } from "../../features/ui/ui_slice";
+import { showToast } from "../../features/ui/ui_slice";
+import { linkMovimenti } from "../../features/conti/doppioni";
 import { useI18n } from "../../i18n/use-i18n";
 import { Card, CardTitle } from "../card/card";
 import Amount from "../amount/amount";
@@ -11,13 +13,15 @@ import "../saldi_check/saldi_check.scss";
 
 /**
  * Movimenti uguali (stesso conto, giorno, tipo, importo e descrizione), gli
- * stessi che il controllo notturno segnala. Due uscite: aprire un movimento e
- * cancellarlo dal dettaglio, oppure dire "non è un doppione" (due caffè uguali
- * nello stesso giorno capitano) e il gruppo non torna più.
+ * stessi che il controllo notturno segnala. Due uscite: vederli nei Movimenti
+ * (filtrati su quel giorno, conto, tipo e descrizione) e cancellare quello di
+ * troppo, oppure dire "non è un doppione" (due caffè uguali nello stesso giorno
+ * capitano) e il gruppo non torna più.
  */
 export default function DoppioniCheck() {
   const { t, locale } = useI18n();
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const gruppi = useAppSelector(selectDoppioni);
   const [busy, setBusy] = useState(false);
 
@@ -56,18 +60,13 @@ export default function DoppioniCheck() {
                   {gruppo.transazioni.length} × <Amount value={gruppo.importo} />
                 </span>
                 <span className="saldi-check__meta">
-                  {ids.map((id, index) => (
-                    <button
-                      key={id}
-                      type="button"
-                      className="saldi-check__link"
-                      onClick={() =>
-                        dispatch(openSheet({ name: "transactionDetail", transactionId: id }))
-                      }
-                    >
-                      {t("duplicates_open").replace("{n}", String(index + 1))}
-                    </button>
-                  ))}
+                  <button
+                    type="button"
+                    className="saldi-check__link"
+                    onClick={() => navigate(linkMovimenti(gruppo))}
+                  >
+                    {t("duplicates_open")}
+                  </button>
                 </span>
               </div>
               <Button

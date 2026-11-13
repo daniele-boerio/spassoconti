@@ -756,8 +756,8 @@
   "tag_suggest_applied": "#{nome} added to {count} transactions",
 
   "duplicates_title": "Possible duplicates",
-  "duplicates_text": "Identical transactions on the same day and account. Open the extra one to delete it, or mark it as not a duplicate.",
-  "duplicates_open": "Open {n}",
+  "duplicates_text": "Identical transactions on the same day and account. Open them in transactions to delete the extra one, or mark it as not a duplicate.",
+  "duplicates_open": "Show in transactions",
   "duplicates_ignore": "Not a duplicate",
   "duplicates_ignored": "It won't be flagged again",
   "duplicate_warning_title": "There is already an identical transaction",

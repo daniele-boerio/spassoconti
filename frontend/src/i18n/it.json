@@ -754,8 +754,8 @@
   "tag_suggest_applied": "#{nome} aggiunto a {count} transazioni",
 
   "duplicates_title": "Possibili doppioni",
-  "duplicates_text": "Movimenti uguali nello stesso giorno, sullo stesso conto. Apri quello di troppo per eliminarlo, oppure segna che non è un doppione.",
-  "duplicates_open": "Apri {n}",
+  "duplicates_text": "Movimenti uguali nello stesso giorno, sullo stesso conto. Aprili nei movimenti per eliminare quello di troppo, oppure segna che non è un doppione.",
+  "duplicates_open": "Vedi nei movimenti",
   "duplicates_ignore": "Non è un doppione",
   "duplicates_ignored": "Non verrà più segnalato",
   "duplicate_warning_title": "C'è già un movimento uguale",
