@@ -2917,20 +2917,14 @@ def trova_doppioni(db: Session, user_id: int) -> list[dict]:
 
 
 def link_movimenti_doppione(gruppo: dict) -> str:
-    """I Movimenti filtrati sul gruppo (giorno, conto, tipo, descrizione).
+    """I Movimenti del giorno del gruppo, senza altri filtri.
 
-    Stessi parametri di `linkMovimenti` nel FE (`features/conti/doppioni.ts`):
-    la push porta dritta ai doppioni, da cui si elimina quello di troppo.
+    Stesso link di `linkMovimenti` nel FE (`features/conti/doppioni.ts`): tutta
+    la giornata, perché solo accanto agli altri movimenti si capisce se è
+    davvero un doppione.
     """
     giorno = gruppo["data"].isoformat()
-    params = {"periodo": "custom", "da": giorno, "a": giorno, "tipo": gruppo["tipo"]}
-    conto_id = gruppo["transazioni"][0].conto_id
-    if conto_id is not None:
-        params["conti"] = str(conto_id)
-    descrizione = (gruppo["descrizione"] or "").strip()
-    if descrizione:
-        params["q"] = descrizione
-    return "/transactions?" + urlencode(params)
+    return "/transactions?" + urlencode({"periodo": "custom", "da": giorno, "a": giorno})
 
 
 def segna_non_doppioni(db: Session, user_id: int, ids: list[int]) -> int:

@@ -149,7 +149,4 @@ def test_la_push_del_doppione_porta_ai_movimenti_filtrati(api, monkeypatch):
     _tx(api, h, conto)
     _tx(api, h, conto)
     services.task_controllo_conti()
-    assert inviate[0]["url"] == (
-        f"/transactions?periodo=custom&da=2026-05-28&a=2026-05-28&tipo=USCITA"
-        f"&conti={conto['id']}&q=Parrucchiere"
-    )
+    assert inviate[0]["url"] == "/transactions?periodo=custom&da=2026-05-28&a=2026-05-28"
