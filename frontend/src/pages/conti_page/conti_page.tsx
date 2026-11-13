@@ -38,6 +38,7 @@ import { selectIsOpenBankingAdmin } from "../../features/profile/profile_slice";
 import { getInvestimenti } from "../../features/investimenti/api_calls";
 import { selectInvestimenti } from "../../features/investimenti/investimento_slice";
 import { showToast } from "../../features/ui/ui_slice";
+import { selectTransactionRevision } from "../../features/transactions/transaction_slice";
 import SaldiCheck from "../../components/saldi_check/saldi_check";
 import DoppioniCheck from "../../components/doppioni_check/doppioni_check";
 import { relativeTime } from "../../services/dates";
@@ -97,9 +98,15 @@ export default function ContiPage() {
     dispatch(getPatrimonio());
     // Saldi che non tornano con i movimenti: di norma nessuno.
     dispatch(getVerificaSaldi());
-    // Possibili doppioni, gli stessi del controllo notturno.
-    dispatch(getDoppioni());
   }, [dispatch]);
+
+  // Possibili doppioni, gli stessi del controllo notturno. Si ricaricano dopo
+  // ogni modifica ai movimenti: eliminato un doppione dal dettaglio, la card
+  // si aggiorna da sola.
+  const revision = useAppSelector(selectTransactionRevision);
+  useEffect(() => {
+    dispatch(getDoppioni());
+  }, [dispatch, revision]);
 
   // Il conto che l'app ha aperto da sé non compare in elenco: esiste perché
   // una transazione deve pur appoggiarsi da qualche parte, non perché

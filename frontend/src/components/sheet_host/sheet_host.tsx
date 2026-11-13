@@ -29,12 +29,15 @@ const FiltersSheet = lazyWithRetry(
  * lista propria (es. dettaglio categoria). Senza dato il form partiva in
  * modalità *creazione*: importo vuoto ("0") e salvataggio che non modificava.
  */
-function EditTransactionLoader({
+function TransactionLoader({
   transactionId,
   onHide,
+  detail = false,
 }: {
   transactionId: string;
   onHide: () => void;
+  /** Apre il dettaglio invece del form di modifica. */
+  detail?: boolean;
 }) {
   const dispatch = useAppDispatch();
   const [transaction, setTransaction] = useState<Transaction | null>(null);
@@ -58,7 +61,11 @@ function EditTransactionLoader({
 
   return (
     <Suspense fallback={null}>
-      <TransactionDialog visible onHide={onHide} transaction={transaction} />
+      {detail ? (
+        <TransactionDetailSheet visible onHide={onHide} transaction={transaction} />
+      ) : (
+        <TransactionDialog visible onHide={onHide} transaction={transaction} />
+      )}
     </Suspense>
   );
 }
@@ -92,7 +99,7 @@ export default function SheetHost() {
       // aperto il form vuoto.
       if (sheet.transactionId && !transaction) {
         return (
-          <EditTransactionLoader
+          <TransactionLoader
             key={sheet.transactionId}
             transactionId={sheet.transactionId}
             onHide={hide}
@@ -110,9 +117,19 @@ export default function SheetHost() {
     case "transactionDetail": {
       const transaction = find(sheet.transactionId);
 
-      // La riga può essere sparita sotto allo sheet (eliminata altrove, o
-      // filtrata via da un refetch): senza dato non c'è dettaglio da mostrare.
-      if (!transaction) return null;
+      // Fuori dalla lista in memoria (es. i doppioni nella pagina Conti, che
+      // possono essere di mesi prima): si carica. Se nel frattempo è stato
+      // eliminato, il loader chiude lo sheet.
+      if (!transaction) {
+        return (
+          <TransactionLoader
+            key={sheet.transactionId}
+            transactionId={sheet.transactionId}
+            onHide={hide}
+            detail
+          />
+        );
+      }
 
       return (
         <Suspense fallback={null}>

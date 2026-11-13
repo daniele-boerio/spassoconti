@@ -57,7 +57,7 @@ pywebpush==2.5.0
 requests==2.34.2
 six==1.17.0
 slowapi==0.1.10
-soupsieve==3.0.4
+soupsieve==4.0
 SQLAlchemy==2.1.8
 starlette==1.10.0
 typing-inspection==0.4.5
