@@ -45,11 +45,12 @@ import { RootState } from "../../store/store";
 
 const initial = reducer(undefined, { type: "@@INIT" });
 
-const profileFromServer = (last_tag_id: number | null) =>
+const profileFromServer = (last_tag_id: number | null, ricorda_ultimo_tag = true) =>
   getProfile.fulfilled(
     {
       username: "mario",
       email: "mario@example.it",
+      ricorda_ultimo_tag,
       last_tag_id,
     } as ProfileResponse,
     "req",
@@ -119,9 +120,17 @@ const transazioneCreata = (tx: {
 
 describe("profile_slice — il default segue le transazioni create", () => {
   it("adotta il tag della transazione appena creata", () => {
-    const state = reducer(initial, transazioneCreata({ tag_id: "7" }));
+    const acceso = reducer(initial, profileFromServer(null));
+    const state = reducer(acceso, transazioneCreata({ tag_id: "7" }));
 
     expect(state.lastTagId).toBe("7");
+  });
+
+  it("con l'impostazione spenta non ricorda niente", () => {
+    const spento = reducer(initial, profileFromServer(null, false));
+    const state = reducer(spento, transazioneCreata({ tag_id: "7" }));
+
+    expect(state.lastTagId).toBeNull();
   });
 
   it("si azzera se la transazione è stata salvata senza tag", () => {

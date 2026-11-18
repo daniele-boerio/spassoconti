@@ -6,7 +6,10 @@ import Sheet from "../../components/sheet/sheet";
 import TagSuggestionSheet from "../../components/tag_suggestion_sheet/tag_suggestion_sheet";
 import { showToast } from "../../features/ui/ui_slice";
 import { updatePreferences } from "../../features/profile/api_calls";
-import { selectSuggerimentiTag } from "../../features/profile/profile_slice";
+import {
+  selectRicordaUltimoTag,
+  selectSuggerimentiTag,
+} from "../../features/profile/profile_slice";
 import {
   applyTag,
   getTagProposals,
@@ -18,6 +21,8 @@ import { TagSuggestion } from "../../features/tags/interfaces";
  * Sezione "Tag" delle Impostazioni:
  * - l'interruttore della domanda al salvataggio (la proposta del tag dalla
  *   descrizione);
+ * - l'interruttore dell'ultimo tag usato preselezionato nel form (spento di
+ *   default);
  * - "Riordina i tag": la stessa logica su tutta la storia, per raggruppare
  *   in blocco le transazioni rimaste senza tag. Resta disponibile anche con
  *   l'interruttore spento: la si apre a mano.
@@ -26,6 +31,7 @@ export default function TagSuggestionsSection() {
   const { t } = useI18n();
   const dispatch = useAppDispatch();
   const enabled = useAppSelector(selectSuggerimentiTag);
+  const ricordaUltimo = useAppSelector(selectRicordaUltimoTag);
 
   const [listOpen, setListOpen] = useState(false);
   // Lista effimera della pulizia: vive finché lo sheet è aperto.
@@ -100,6 +106,20 @@ export default function TagSuggestionsSection() {
             checked={enabled}
             onChange={(checked) =>
               dispatch(updatePreferences({ suggerimenti_tag: checked }))
+            }
+          />
+        </label>
+
+        <label className="settings-row">
+          <span className="settings-row__text">
+            <span className="settings-row__label">{t("tag_remember_toggle")}</span>
+            <span className="settings-row__hint">{t("tag_remember_toggle_hint")}</span>
+          </span>
+
+          <Toggle
+            checked={ricordaUltimo}
+            onChange={(checked) =>
+              dispatch(updatePreferences({ ricorda_ultimo_tag: checked }))
             }
           />
         </label>

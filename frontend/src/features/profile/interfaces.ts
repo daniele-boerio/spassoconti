@@ -60,6 +60,7 @@ export interface RegistrationStatus {
 /** PUT /me/preferenze: aggiornamento parziale degli interruttori. */
 export interface PreferencesParams {
   suggerimenti_tag?: boolean;
+  ricorda_ultimo_tag?: boolean;
 }
 
 export interface ProfileState {
@@ -84,6 +85,8 @@ export interface ProfileState {
   registrationOpen: boolean;
   /** Al salvataggio propone un tag dalla descrizione (Impostazioni). */
   suggerimentiTag: boolean;
+  /** Il form di nuova transazione parte con l'ultimo tag usato (Impostazioni). */
+  ricordaUltimoTag: boolean;
   // Tag da preselezionare nel form di nuova transazione: è l'ultimo usato,
   // ricordato sull'account (quindi valido su ogni dispositivo). null = nessuna
   // precompilazione, ed è lo stato in cui si torna salvando senza tag.
@@ -105,6 +108,7 @@ export interface ProfileResponse {
   is_open_banking_admin?: boolean;
   is_admin?: boolean;
   suggerimenti_tag?: boolean;
+  ricorda_ultimo_tag?: boolean;
   // Tetto di spesa mensile (Decimal sul BE: arriva come stringa).
   monthly_spending_budget?: number | string | null;
   last_tag_id?: number | null;

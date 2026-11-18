@@ -392,6 +392,7 @@ def create_transazione(
         # Solo quando l'ha scelto davvero l'utente: il giroconto il campo tag non
         # ce l'ha (lo forziamo a NULL) e il rimborso eredita quello del padre —
         # farli scrivere il default lo cambierebbe alle spalle dell'utente.
+        # E solo se l'utente l'ha chiesto (Impostazioni → ricorda l'ultimo tag).
         if transazione.tipo != TipoTransazione.RICARICA and not parent_trans:
             remember_last_tag(db, current_user_id, new_trans.tag_id)
 

@@ -11129,6 +11129,17 @@
               }
             ],
             "title": "Suggerimenti Tag"
+          },
+          "ricorda_ultimo_tag": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ricorda Ultimo Tag"
           }
         },
         "type": "object",
@@ -11183,6 +11194,11 @@
             "type": "boolean",
             "title": "Suggerimenti Tag",
             "default": true
+          },
+          "ricorda_ultimo_tag": {
+            "type": "boolean",
+            "title": "Ricorda Ultimo Tag",
+            "default": false
           },
           "last_tag_id": {
             "anyOf": [

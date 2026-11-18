@@ -68,6 +68,11 @@ class User(Base):
     # (services.suggerisci_tag). Si spegne dalle Impostazioni.
     suggerimenti_tag = Column(Boolean, nullable=False, default=True)
 
+    # Il form di nuova transazione parte con l'ultimo tag usato (last_tag_id).
+    # Spento di default: un tag preselezionato finisce facilmente su spese che
+    # non c'entrano. Si accende dalle Impostazioni.
+    ricorda_ultimo_tag = Column(Boolean, nullable=False, default=False)
+
     # --- Ban dall'admin ---
     # Valorizzato = l'utente non entra più (login, 2FA, passkey, refresh). Il
     # profilo e i dati restano: togliere il ban (NULL) li rende di nuovo

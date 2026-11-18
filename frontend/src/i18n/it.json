@@ -746,6 +746,8 @@
   "tag_suggest_settings_title": "Tag",
   "tag_suggest_toggle": "Proponi un tag quando salvi",
   "tag_suggest_toggle_hint": "Impara dalle tue descrizioni: «con Gaia», «a lavoro»…",
+  "tag_remember_toggle": "Ricorda l'ultimo tag usato",
+  "tag_remember_toggle_hint": "Le nuove transazioni partono con il tag dell'ultima che hai salvato",
   "tag_suggest_cleanup": "Riordina i tag",
   "tag_suggest_cleanup_hint": "Raggruppa le transazioni senza tag che si somigliano",
   "tag_suggest_cleanup_empty": "Niente da riordinare: non ci sono gruppi di transazioni senza tag che si somigliano.",

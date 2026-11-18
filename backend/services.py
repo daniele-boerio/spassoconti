@@ -2055,11 +2055,12 @@ def remember_last_tag(db: Session, user_id: int, tag_id: Optional[int]) -> None:
     della funzione. Salvare una transazione senza tag è il modo in cui l'utente
     dice "basta precompilare", quindi NULL va persistito come qualsiasi altro
     valore. Il commit resta al chiamante, dentro la stessa transazione DB della
-    creazione: se quella fallisce, il default non deve muoversi.
+    creazione: se quella fallisce, il default non deve muoversi. Con
+    `ricorda_ultimo_tag` spento non scrive niente.
     """
-    db.query(models.User).filter(models.User.id == user_id).update(
-        {"last_tag_id": tag_id}
-    )
+    db.query(models.User).filter(
+        models.User.id == user_id, models.User.ricorda_ultimo_tag.is_(True)
+    ).update({"last_tag_id": tag_id}, synchronize_session=False)
 
 
 # --- NOTIFICHE PUSH ----------------------------------------------------------
