@@ -203,6 +203,9 @@ def get_me(
     response = UserResponse.model_validate(user)
     response.is_open_banking_admin = is_open_banking_admin
     response.is_admin = auth.is_admin(user)
+    if not user.ricorda_ultimo_tag:
+        # Spento: niente da preselezionare, qualunque cosa ci sia in colonna.
+        response.last_tag_id = None
     return response
 
 
@@ -265,7 +268,7 @@ def update_preferenze(
     db: Session = Depends(get_db),
     current_user_id: int = Depends(auth.get_current_user_id),
 ):
-    """Interruttori delle Impostazioni (oggi: i suggerimenti dei tag)."""
+    """Interruttori delle Impostazioni (suggerimenti dei tag, ultimo tag usato)."""
     user = db.query(User).filter(User.id == current_user_id).first()
     if not user:
         raise HTTPException(
@@ -277,6 +280,10 @@ def update_preferenze(
         for field, value in payload.model_dump(exclude_unset=True).items():
             if value is not None:
                 setattr(user, field, value)
+        if payload.ricorda_ultimo_tag is False:
+            # Riaccendendolo si riparte dal prossimo tag scelto, non da uno
+            # rimasto in colonna da chissà quando.
+            user.last_tag_id = None
         db.commit()
     except Exception:
         db.rollback()

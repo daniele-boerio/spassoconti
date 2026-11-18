@@ -108,6 +108,7 @@ class UserPreferenze(BaseModel):
     inviati restano com'erano."""
 
     suggerimenti_tag: Optional[bool] = None
+    ricorda_ultimo_tag: Optional[bool] = None
 
 
 class UserUpdate(BaseModel):
@@ -155,7 +156,9 @@ class UserResponse(BaseModel):
     is_admin: bool = False
     # Proposta del tag dalla descrizione al salvataggio (Impostazioni).
     suggerimenti_tag: bool = True
-    # Tag da preselezionare nel form di nuova transazione (vedi User.last_tag_id)
+    # Preselezione dell'ultimo tag usato nel form di nuova transazione.
+    ricorda_ultimo_tag: bool = False
+    # Tag da preselezionare (null se ricorda_ultimo_tag è spento) nel form di nuova transazione (vedi User.last_tag_id)
     last_tag_id: Optional[int] = None
 
     @field_validator("total_budget", "monthly_spending_budget", mode="after")

@@ -1,5 +1,8 @@
 """Il tag dell'ultima transazione creata precompila il form della successiva.
 
+Solo se l'utente l'ha acceso (`users.ricorda_ultimo_tag`, spento di default):
+la fixture `auth_headers` lo accende, i test in fondo guardano il caso spento.
+
 Il default vive sull'account (`users.last_tag_id`), non nel browser, così segue
 l'utente fra dispositivi. Qui fissiamo le due metà della funzione: salvare con
 un tag lo imposta, salvare senza lo azzera.
@@ -60,7 +63,10 @@ def auth_headers(client):
         json={"username": "mario", "email": "mario@example.it", "password": "password123"},
     )
     assert r.status_code == 200, r.text
-    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+    headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    r = client.put("/me/preferenze", json={"ricorda_ultimo_tag": True}, headers=headers)
+    assert r.status_code == 200, r.text
+    return headers
 
 
 @pytest.fixture()
@@ -193,4 +199,44 @@ def test_il_default_e_per_utente(client, conto, tag_id, auth_headers):
     altro = {"Authorization": f"Bearer {r.json()['access_token']}"}
 
     assert _last_tag(client, altro) is None
+    assert _last_tag(client, auth_headers) == tag_id
+
+
+def _nuovo_utente(client, username="anna"):
+    r = client.post(
+        "/register",
+        json={"username": username, "email": f"{username}@example.it", "password": "password123"},
+    )
+    assert r.status_code == 200, r.text
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+
+def test_spento_di_default_non_ricorda_niente(client):
+    headers = _nuovo_utente(client)
+    me = client.get("/me", headers=headers).json()
+    assert me["ricorda_ultimo_tag"] is False
+
+    r = client.post("/conti", json={"nome": "C", "saldo": 10, "default": True,
+                                    "ricarica_automatica": False}, headers=headers)
+    conto = r.json()
+    tag = client.post("/tags", json={"nome": "Casa"}, headers=headers).json()["id"]
+    _crea(client, headers, conto, tag_id=tag)
+
+    assert _last_tag(client, headers) is None
+
+
+def test_spegnerlo_azzera_il_default(client, auth_headers, conto, tag_id):
+    _crea(client, auth_headers, conto, tag_id=tag_id)
+    assert _last_tag(client, auth_headers) == tag_id
+
+    r = client.put("/me/preferenze", json={"ricorda_ultimo_tag": False}, headers=auth_headers)
+    assert r.status_code == 200, r.text
+    assert r.json()["last_tag_id"] is None
+    _crea(client, auth_headers, conto, tag_id=tag_id)
+    assert _last_tag(client, auth_headers) is None
+
+    # Riacceso, riparte dal prossimo tag scelto.
+    client.put("/me/preferenze", json={"ricorda_ultimo_tag": True}, headers=auth_headers)
+    assert _last_tag(client, auth_headers) is None
+    _crea(client, auth_headers, conto, tag_id=tag_id)
     assert _last_tag(client, auth_headers) == tag_id

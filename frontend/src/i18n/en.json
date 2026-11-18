@@ -748,6 +748,8 @@
   "tag_suggest_settings_title": "Tags",
   "tag_suggest_toggle": "Suggest a tag when saving",
   "tag_suggest_toggle_hint": "Learns from your descriptions: “with Gaia”, “at work”…",
+  "tag_remember_toggle": "Remember the last tag used",
+  "tag_remember_toggle_hint": "New transactions start with the tag of the last one you saved",
   "tag_suggest_cleanup": "Tidy up tags",
   "tag_suggest_cleanup_hint": "Group similar untagged transactions",
   "tag_suggest_cleanup_empty": "Nothing to tidy up: there are no groups of similar untagged transactions.",
