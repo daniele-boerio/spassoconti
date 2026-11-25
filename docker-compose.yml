@@ -80,6 +80,9 @@ services:
       - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
       - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
       - VAPID_SUBJECT=${VAPID_SUBJECT:-https://conti.spassocasa.it}
+      # SpassoSpesa (lista della spesa di casa) registra qui le spese con lo scontrino
+      # (routers/integrazioni.py). Stesso valore impostato anche là; vuoto = spento.
+      - SPASSOSPESA_TOKEN=${SPASSOSPESA_TOKEN:-}
     healthcheck:
       # /api/health interroga il database: se il BE non raggiunge Postgres il
       # container risulta unhealthy, invece di "healthy" con ogni chiamata in 500.

@@ -51,6 +51,7 @@ from routers import (
     notifiche,
     mcp,
     controlli,
+    integrazioni,
 )
 
 logger = logging.getLogger(__name__)
@@ -260,6 +261,7 @@ api.include_router(notifiche.router)  # Notifiche push
 api.include_router(admin.router)  # Admin: lista utenti e ban
 api.include_router(controlli.router)  # Doppioni e quadrature
 api.include_router(mcp.router)  # Server MCP in sola lettura (/mcp) + OAuth (/mcp/oauth)
+api.include_router(integrazioni.router)  # SpassoSpesa: spese dalla lista di casa (token)
 
 
 # Il healthcheck del container. Tocca il database apposta: un BE che risponde ma

@@ -6801,6 +6801,119 @@
           }
         }
       }
+    },
+    "/api/integrazioni/spassospesa/account": {
+      "get": {
+        "tags": [
+          "Integrazioni"
+        ],
+        "summary": "Account",
+        "operationId": "account_api_integrazioni_spassospesa_account_get",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Email"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrazioni/spassospesa/transazioni": {
+      "post": {
+        "tags": [
+          "Integrazioni"
+        ],
+        "summary": "Crea Movimento",
+        "operationId": "crea_movimento_api_integrazioni_spassospesa_transazioni_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MovimentoSpesa"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -11309,6 +11422,104 @@
         ],
         "title": "VerificaSaldoOut",
         "description": "Un conto il cui saldo non torna con i movimenti registrati."
+      },
+      "MovimentoSpesa": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "USCITA",
+              "RIMBORSO"
+            ],
+            "title": "Tipo"
+          },
+          "importo": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Importo"
+          },
+          "data": {
+            "type": "string",
+            "format": "date",
+            "title": "Data"
+          },
+          "descrizione": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descrizione"
+          },
+          "conto_id": {
+            "type": "integer",
+            "title": "Conto Id"
+          },
+          "categoria_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria Id"
+          },
+          "sottocategoria_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sottocategoria Id"
+          },
+          "parent_transaction_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Transaction Id"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 8,
+            "title": "Idempotency Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "tipo",
+          "importo",
+          "data",
+          "conto_id",
+          "idempotency_key"
+        ],
+        "title": "MovimentoSpesa"
       }
     },
     "securitySchemes": {

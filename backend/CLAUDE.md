@@ -22,6 +22,10 @@ Alembic migrations, JWT bearer auth, APScheduler background jobs.
   `token_version`); discovery at `/.well-known/oauth-*` on the root app, proxied by a
   dedicated nginx location. New tools: user-scoped, soft-delete aware, same helpers as
   `routers/statistics.py`.
+- `routers/integrazioni.py` — server-to-server endpoints for SpassoSpesa (the shared
+  shopping list): `SPASSOSPESA_TOKEN` bearer + the user's email, 404 when the token is
+  unset. Movements go through `create_transazione` itself (scoping, balance lock,
+  idempotency): don't duplicate that logic there. Only USCITA and RIMBORSO.
 - `tests/` — pytest on in-memory SQLite (`db_session` fixture in `tests/conftest.py`);
   tests call endpoint functions directly, the auth flow uses `TestClient`.
 
